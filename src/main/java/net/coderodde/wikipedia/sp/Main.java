@@ -35,11 +35,6 @@ public class Main {
         
         List<String> linkNameList = extractLinkNames(jsonText);
         
-        int i = 1;
-        
-        for (String linkName : linkNameList) {
-            System.out.printf("%3d: %s\n", i++, linkName);
-        }
     }
     
     private static String getURLByTitle(String title) {
@@ -60,9 +55,6 @@ public class Main {
                                              .getValue()
                                              .getAsJsonObject();
         JsonArray linkNameArray = mainObject.get("links").getAsJsonArray();
-        
-        System.out.println("Yeah");
-        System.out.println(linkNameArray);
         
         linkNameArray.forEach((element) -> {
             int namespace = element.getAsJsonObject().get("ns").getAsInt();
