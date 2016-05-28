@@ -31,8 +31,8 @@ public class PathFinder {
     static {
         ENCODING_MAP.put(' ', "_");
         ENCODING_MAP.put('"', "%22");
-        ENCODING_MAP.put('\'', "%27");
-        ENCODING_MAP.put(',', "%2C");
+//        ENCODING_MAP.put('\'', "%27");
+//        ENCODING_MAP.put(',', "%2C");
         ENCODING_MAP.put(';', "%3B");
         
         ENCODING_MAP.put('<', "%3C");
@@ -109,6 +109,7 @@ public class PathFinder {
             
             if (DISTANCEA.size() < DISTANCEB.size()) {
                 String current = QUEUEA.removeFirst();
+                System.out.println("Forward: " + current);
                 
                 if (PARENTSB.containsKey(current) 
                         && bestDistanceSoFar > DISTANCEA.get(current) +
@@ -127,6 +128,8 @@ public class PathFinder {
                 }
             } else {
                 String current = QUEUEB.removeFirst();
+                
+                System.out.println("Backward: " + current);
                 
                 if (PARENTSA.containsKey(current) 
                         && bestDistanceSoFar > DISTANCEA.get(current) + 
