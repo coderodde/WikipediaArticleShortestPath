@@ -28,13 +28,30 @@ public class Main {
             "&pllimit=max" + 
             "&format=json";
     
+    private static final String BACKWARD_URL_FORMAT = 
+            "https://en.wikipedia.org/w/api.php" +
+            "?action=query" +
+            "&list=backlinks" +
+            "&bltitle=%s" + 
+            "&bllimit=max" + 
+            "&format=json";
+   
+    
     public static void main(String[] args) throws IOException {
-        String jsonText = 
-                IOUtils.toString(new URL(getURLByTitle("Disc_jockey")), 
-                                 Charset.forName("UTF-8"));
+//        List<String> path = new PathFinder().findShortestPath("DJ_Qbert", "Disc_jockey");
+        List<String> path = new PathFinder().findShortestPath("DJ_Qbert", "Dreamcast");
         
-        List<String> linkNameList = extractLinkNames(jsonText);
+        System.out.println("Path size: " + path.size());
         
+        
+//        String jsonText = 
+//                IOUtils.toString(new URL(getURLByTitle("Disc_jockey")), 
+//                                 Charset.forName("UTF-8"));
+//        
+//        List<String> linkNameList = extractLinkNames(jsonText);
+        
+//        String jsonText = IOUtils.toString(new URL(String.format(BACKWARD_URL_FORMAT, "Disc_jockey")), Charset.forName("UTF-8"));
+//        System.out.println(extractBackwardLinkNames(jsonText));
     }
     
     private static String getURLByTitle(String title) {
@@ -67,6 +84,37 @@ public class Main {
                 linkNameList.add(title);
             }
         });
+        
+        return linkNameList;
+    }
+    
+    private static List<String> extractBackwardLinkNames(final String jsonText) {
+        List<String> linkNameList = new ArrayList<>();
+        JsonObject root  = new JsonParser().parse(jsonText).getAsJsonObject();
+        
+//        System.out.println(root.has("query"));
+//        
+        JsonObject queryObject  = root.get("query").getAsJsonObject();
+        JsonArray backLinkArray  = queryObject.get("backlinks").getAsJsonArray();
+        
+        System.out.println("Size: "+ backLinkArray.size());
+        
+        backLinkArray.forEach((element) -> {
+            int namespace = element.getAsJsonObject().get("ns").getAsInt();
+            
+            if (namespace == 0) {
+                String title = element.getAsJsonObject()
+                                      .get("title")
+                                      .getAsString();
+                
+                linkNameList.add(title);
+            }
+        });
+        
+        int i = 1;
+        for (String s : linkNameList) {
+            System.out.printf("%3d: %s\n", i++, s);
+        }
         
         return linkNameList;
     }

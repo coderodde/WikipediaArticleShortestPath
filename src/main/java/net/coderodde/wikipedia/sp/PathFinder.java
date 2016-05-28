@@ -12,6 +12,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
 
 /**
  * This class implements an unweighted shortest path finder in the Wikipedia 
@@ -20,6 +25,26 @@ import java.io.IOException;
  * @version 1.6 (May 28, 2016)
  */
 public class PathFinder {
+    
+    private static final Map<Character, String> ENCODING_MAP = new HashMap<>();
+    
+    static {
+        ENCODING_MAP.put(' ', "_");
+        ENCODING_MAP.put('"', "%22");
+        ENCODING_MAP.put('\'', "%27");
+        ENCODING_MAP.put(',', "%2C");
+        ENCODING_MAP.put(';', "%3B");
+        
+        ENCODING_MAP.put('<', "%3C");
+        ENCODING_MAP.put('>', "%3E");
+        ENCODING_MAP.put('?', "%3F");
+        ENCODING_MAP.put('[', "%5B");
+        ENCODING_MAP.put(']', "%5D");
+        
+        ENCODING_MAP.put('{', "%7B");
+        ENCODING_MAP.put('|', "%7C");
+        ENCODING_MAP.put('}', "%7D");
+    }
     
     private static final String PROTOCOL_PREFIX_1 = "https://";
     private static final String PROTOCOL_PREFIX_2 = "http://";
@@ -41,34 +66,13 @@ public class PathFinder {
             "&bllimit=max" + 
             "&format=json";
     
-    public List<String> findShortestPath(String sourceUrl, String targetUrl) 
+    public List<String> findShortestPath(String sourceTitle, String targetTitle) 
     throws IOException {
-        sourceUrl = sourceUrl.toLowerCase().trim();
-        targetUrl = targetUrl.toLowerCase().trim();
+        sourceTitle = sourceTitle.trim();
+        targetTitle = targetTitle.trim();
         
-        if (!sourceUrl.contains(EXPECTED_URL_SUBSTRING)) {
-            throw new IllegalArgumentException(
-                    "Invalid source URL to Wikipedia: \"" + sourceUrl + "\".");
-        }
-        
-        if (!targetUrl.contains(EXPECTED_URL_SUBSTRING)) {
-            throw new IllegalArgumentException(
-                    "Invalid target URL to Wikipedia: \"" + targetUrl + "\".");
-        }
-        
-        if (differentLanguages(sourceUrl, targetUrl)) {
-            throw new IllegalArgumentException(
-                    "The Wikipedia URLs (" + sourceUrl + ", " + targetUrl + 
-                    ") seem to point to the articles of different languages.");
-        }
-        
-        return computeShortestPath(sourceUrl, targetUrl);
-    }
-    
-    private List<String> computeShortestPath(String source, String target) 
-    throws IOException {
-        if (source.equals(target)) {
-            return new ArrayList<>(Arrays.asList(source));
+        if (sourceTitle.equals(targetTitle)) {
+            return new ArrayList<>(Arrays.asList(sourceTitle));
         }
         
         Deque<String> QUEUEA = new ArrayDeque<>();
@@ -83,14 +87,14 @@ public class PathFinder {
         String touchNode = null;
         int bestDistanceSoFar = Integer.MAX_VALUE;
         
-        QUEUEA.add(source);
-        QUEUEB.add(target);
+        QUEUEA.add(sourceTitle);
+        QUEUEB.add(targetTitle);
         
-        PARENTSA.put(source, null);
-        PARENTSB.put(target, null);
+        PARENTSA.put(sourceTitle, null);
+        PARENTSB.put(targetTitle, null);
         
-        DISTANCEA.put(source, 0);
-        DISTANCEB.put(target, 0);
+        DISTANCEA.put(sourceTitle, 0);
+        DISTANCEB.put(targetTitle, 0);
         
         while (!QUEUEA.isEmpty() && !QUEUEB.isEmpty()) {
             if (touchNode != null) {
@@ -115,12 +119,34 @@ public class PathFinder {
                 }
                 
                 for (String child : getChildArticles(current)) {
-                    
+                    if (!PARENTSA.containsKey(child)) {
+                        PARENTSA.put(child, current);
+                        DISTANCEA.put(child, DISTANCEA.get(current) + 1);
+                        QUEUEA.addLast(child);
+                    }
                 }
             } else {
                 String current = QUEUEB.removeFirst();
+                
+                if (PARENTSA.containsKey(current) 
+                        && bestDistanceSoFar > DISTANCEA.get(current) + 
+                                               DISTANCEB.get(current)) {
+                    bestDistanceSoFar = DISTANCEA.get(current) +
+                                        DISTANCEB.get(current);
+                    touchNode = current;
+                }
+                
+                for (String parent : getParentArticles(current)) {
+                    if (!PARENTSB.containsKey(parent)) {
+                        PARENTSB.put(parent, current);
+                        DISTANCEB.put(parent, DISTANCEB.get(current) + 1);
+                        QUEUEB.addLast(parent);
+                    }
+                }
             }
         }
+        
+        return new ArrayList<>();
     }
     
     private List<String> tracebackPath(String touchNode, 
@@ -148,7 +174,7 @@ public class PathFinder {
     private static boolean differentLanguages(String url1, String url2) {
         url1 = removeProtocolPrefix(url1);
         url2 = removeProtocolPrefix(url2);
-        return url1.substring(0, 2).equals(url2.substring(0, 2));
+        return !url1.substring(0, 2).equals(url2.substring(0, 2));
     }
     
     private static String removeProtocolPrefix(String url) {
@@ -170,17 +196,25 @@ public class PathFinder {
      * @return the list of child URLs.
      * @throws IOException may be thrown.
      */
-    private static List<String> baseGetNeighbors(String current, 
+    private static List<String> baseGetNeighbors(String currentTitle, 
                                                  boolean forward) 
     throws IOException{
-        int lastIndexOfSlash = current.lastIndexOf('/');
-        String currentTitle = current.substring(lastIndexOfSlash + 1);
-        String jsonText = 
+        String jsonDataUrl = 
                 String.format(forward ? 
                                     FORWARD_URL_FORMAT : 
-                                    BACKWARD_URL_FORMAT, 
-                              currentTitle);
-        return extractLinkTitles(jsonText, forward);
+                                    BACKWARD_URL_FORMAT,
+                              URLEncoder.encode(currentTitle, "UTF-8"));
+        
+        System.out.println("Direction: " + (forward ? "forward" : "backward") +
+                           ", URL: " + jsonDataUrl);
+        
+        String jsonText = 
+                IOUtils.toString(new URL(jsonDataUrl), 
+                                 Charset.forName("UTF-8"));
+        
+        return forward ?
+               extractForwardLinkTitles(jsonText) : 
+               extractBackwardLinkTitles(jsonText);
     }
     
     /**
@@ -207,25 +241,28 @@ public class PathFinder {
         return baseGetNeighbors(current, false);
     }
     
-    private static List<String> extractLinkTitles(String jsonText, 
-                                                  boolean forward) {
+    /**
+     * Returns all the Wikipedia article titles parsed from a JSON text 
+     * {@code jsonText}.
+     * 
+     * @param jsonText the data in JSON format.
+     * @return a list of Wikipedia article titles parsed from {@code jsonText}.
+     */
+    private static List<String> extractForwardLinkTitles(String jsonText) {
         List<String> linkNameList = new ArrayList<>();
-        JsonObject root  = new JsonParser().parse(jsonText).getAsJsonObject();
+
+        JsonObject root = new JsonParser().parse(jsonText).getAsJsonObject();
+        JsonObject queryObject = root.get("query").getAsJsonObject();
+        JsonObject pagesObject = queryObject.get("pages").getAsJsonObject();
+        JsonObject mainObject  = pagesObject.entrySet()
+                                            .iterator()
+                                            .next()
+                                            .getValue()
+                                            .getAsJsonObject();
         
-        System.out.println(root.has("query"));
+        JsonArray linkNameArray = mainObject.get("links")
+                                            .getAsJsonArray();
         
-        JsonObject queryObject  = root.get("query").getAsJsonObject();
-        JsonObject pagesObject  = queryObject.get("pages").getAsJsonObject();
-        JsonObject mainObject   = pagesObject.entrySet()
-                                             .iterator()
-                                             .next()
-                                             .getValue()
-                                             .getAsJsonObject();
-        JsonArray linkNameArray = mainObject.get("links").getAsJsonArray();
-        
-//        System.out.println("Yeah");
-//        System.out.println(linkNameArray);
-//        
         linkNameArray.forEach((element) -> {
             int namespace = element.getAsJsonObject().get("ns").getAsInt();
             
@@ -234,10 +271,50 @@ public class PathFinder {
                                       .get("title")
                                       .getAsString();
                 
-                linkNameList.add(forward ? );
+                linkNameList.add(encodeWikipediaStyle(title));
             }
         });
         
         return linkNameList;
+    }
+    
+    private static List<String> extractBackwardLinkTitles(String jsonText) {
+        List<String> linkNameList = new ArrayList<>();
+        
+        JsonObject root = new JsonParser().parse(jsonText).getAsJsonObject();
+        JsonObject queryObject = root.get("query").getAsJsonObject();
+        JsonArray backLinkArray = queryObject.get("backlinks").getAsJsonArray();
+        
+        backLinkArray.forEach((element) -> {
+            int namespace = element.getAsJsonObject()
+                                   .get("ns")
+                                   .getAsInt();
+            
+            if (namespace == 0) {
+                String title = element.getAsJsonObject()
+                                      .get("title")
+                                      .getAsString();
+                
+                linkNameList.add(encodeWikipediaStyle(title));
+            }
+        });
+        
+        return linkNameList;
+    }
+    
+    private static String encodeWikipediaStyle(String s) {
+        StringBuilder sb = new StringBuilder();
+        
+        for (char c : s.toCharArray()) {
+            String encoder = ENCODING_MAP.get(c);
+            
+            if (encoder != null) {
+                sb.append(encoder);
+            } else {
+                sb.append(c);
+            }
+        }
+        
+        return sb.toString();
     }
 }
