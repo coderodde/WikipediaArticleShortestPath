@@ -544,7 +544,7 @@ public class PathFinder {
                                                 .getValue()
                                                 .getAsJsonObject();
 
-            linkNameArray = mainObject.get("links") .getAsJsonArray();
+            linkNameArray = mainObject.get("links").getAsJsonArray();
         } catch (NullPointerException ex) {
             return linkNameList;
         }
@@ -717,9 +717,13 @@ public class PathFinder {
         
         String apiUrl = constructWikipediaAPIBaseURL(wikipediaUrlFrom);
         System.out.println("API URL: " + apiUrl);
-        System.exit(0);
+//        System.exit(0);
+        
+        to = to.substring(to.lastIndexOf("/") + 1);
+        from = from.substring(from.lastIndexOf("/") + 1);
         
         long startTime = System.currentTimeMillis();
+        parallel = true;
         
         if (parallel) {
             System.out.println("[STATUS] Doing parallel search");
