@@ -16,6 +16,8 @@ import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
 
 /**
@@ -61,6 +63,263 @@ public class PathFinder {
             "&bllimit=max" + 
             "&format=json";
 
+    public List<String> findShortestPathParallel(String sourceTitle,
+                                                 String targetTitle,
+                                                 PrintStream out) {
+        if (sourceTitle.equals(targetTitle)) {
+            return new ArrayList<>(Arrays.asList(sourceTitle));
+        }
+        
+        TouchNodeHolder touchNodeHolder = new TouchNodeHolder();
+        
+        ForwardThread forwardThread = new ForwardThread(sourceTitle,
+                                                        touchNodeHolder,
+                                                        out);
+        
+        BackwardThread backwardThread = new BackwardThread(targetTitle,
+                                                           touchNodeHolder,
+                                                           out);
+        touchNodeHolder.setForwardThread(forwardThread);
+        touchNodeHolder.setBackwardThread(backwardThread);
+        
+        forwardThread.start();
+        backwardThread.run();
+        
+        try {
+            forwardThread.join();
+        } catch (InterruptedException ex) {
+            throw new IllegalStateException(
+                    "The forward thread threw " + 
+                            ex.getClass().getSimpleName() + ": " + 
+                            ex.getMessage(), ex);
+        }
+        
+        return touchNodeHolder.constructPath();
+    }
+    
+    private static class ForwardThread extends Thread {
+        
+        private final Deque<String> QUEUE = new ArrayDeque<>();
+        private final Map<String, String> PARENTS = new HashMap<>();
+        private final Map<String, Integer> DISTANCE = new ConcurrentHashMap<>();
+        private final PrintStream out;
+        private volatile boolean exit;
+        private final TouchNodeHolder touchNodeHolder;
+        
+        ForwardThread(String sourceTitle, 
+                      TouchNodeHolder touchNodeHolder,
+                      PrintStream out) {
+            Objects.requireNonNull(sourceTitle, "The source title is null.");
+            
+            this.touchNodeHolder = 
+                    Objects.requireNonNull(touchNodeHolder, 
+                                           "The TouchNodeHolder is null.");
+            
+            QUEUE.add(sourceTitle);
+            PARENTS.put(sourceTitle, null);
+            DISTANCE.put(sourceTitle, 0);
+            this.out = out;
+        }
+        
+        Map<String, Integer> getDistanceMap() {
+            return DISTANCE;
+        }
+        
+        Map<String, String> getParentMap() {
+            return PARENTS;
+        }
+        
+        void exitThread() {
+            exit = true;
+        }
+        
+        @Override
+        public void run() {
+            try {
+                while (!QUEUE.isEmpty()) {
+                    if (exit) {
+                        return;
+                    }
+                    
+                    String current = QUEUE.removeFirst();
+
+                    if (out != null) {
+                        out.println("Forward:  " + current);
+                    }
+                    
+                    touchNodeHolder.updateFromForwardSearch(current);
+                    
+                    if (touchNodeHolder.pathIsOptimal(current)) {
+                        return;
+                    }
+                    
+                    for (String child : getChildArticles(current)) {
+                        if (!PARENTS.containsKey(child)) {
+                            PARENTS.put(child, current);
+                            DISTANCE.put(child, DISTANCE.get(current) + 1);
+                            QUEUE.addLast(child);
+                        }
+                    }
+                }
+            } catch (IOException ex) {
+                throw new IllegalStateException(
+                        ex.getClass().getSimpleName() + " was thrown in the " +
+                        "forward thread: " + ex.getMessage(), ex);
+            }
+        }
+    }
+    
+    private static final class BackwardThread extends Thread {
+        
+        private final Deque<String> QUEUE = new ArrayDeque<>();
+        private final Map<String, String> PARENTS = new HashMap<>();
+        private final Map<String, Integer> DISTANCE = new ConcurrentHashMap<>();
+        private final PrintStream out;
+        private volatile boolean exit;
+        private final TouchNodeHolder touchNodeHolder;
+        
+        BackwardThread(String targetTitle, 
+                       TouchNodeHolder touchNodeHolder,
+                       PrintStream out) {
+            Objects.requireNonNull(targetTitle, "The target title is null.");
+            this.touchNodeHolder = 
+                    Objects.requireNonNull(touchNodeHolder, 
+                                           "The TouchNodeHolder is null.");
+            QUEUE.add(targetTitle);
+            PARENTS.put(targetTitle, null);
+            DISTANCE.put(targetTitle, 0);
+            this.out = out;
+        }
+        
+        Map<String, Integer> getDistanceMap() {
+            return DISTANCE;
+        }
+        
+        Map<String, String> getParentMap() {
+            return PARENTS;
+        }
+        
+        void exitThread() {
+            exit = true;
+        }
+        
+        @Override
+        public void run() {
+            try {
+                while (!QUEUE.isEmpty()) {
+                    if (exit) {
+                        return;
+                    }
+                    
+                    String current = QUEUE.removeFirst();
+                    
+                    if (out != null) {
+                        out.println("Backward: " + current);
+                    }
+                    
+                    touchNodeHolder.updateFromBackwardThread(current);
+                    
+                    if (touchNodeHolder.pathIsOptimal(current)) {
+                        return;
+                    }
+                    
+                    for (String parent : getParentArticles(current)) {
+                        if (!PARENTS.containsKey(parent)) {
+                            PARENTS.put(parent, current);
+                            DISTANCE.put(parent, DISTANCE.get(current) + 1);
+                            QUEUE.addLast(parent);
+                        }
+                    }
+                }
+            } catch (IOException ex) {
+                throw new IllegalStateException(
+                        ex.getClass().getSimpleName() + " was thrown in the " +
+                        "forward thread: " + ex.getMessage(), ex);
+            }
+        }
+    }
+    
+    private static final class TouchNodeHolder {
+        
+        private ForwardThread forwardThread;
+        private BackwardThread backwardThread;
+        private volatile String touchNode;
+        private volatile int bestDistanceSoFar = Integer.MAX_VALUE;
+        
+        void setForwardThread(ForwardThread forwardThread) {
+            this.forwardThread = forwardThread;
+        }
+        
+        void setBackwardThread(BackwardThread backwardThread) {
+            this.backwardThread = backwardThread;
+        }
+        
+        synchronized boolean pathIsOptimal(String node) {
+            if (touchNode == null) {
+                return false;
+            }
+            
+            if (!forwardThread.getDistanceMap().containsKey(node)) {
+                return false;
+            }
+            
+            if (!backwardThread.getDistanceMap().containsKey(node)) {
+                return false;
+            }
+            
+            int distance = forwardThread.getDistanceMap().get(node) + 
+                           backwardThread.getDistanceMap().get(node);
+            
+            if (distance > bestDistanceSoFar) {
+                forwardThread .exitThread();
+                backwardThread.exitThread();
+                
+                try {
+                    forwardThread .join();
+                    backwardThread.join();
+                } catch (InterruptedException ex) {
+                    
+                }
+                
+                return true;
+            }
+            
+            return false;
+        }
+        
+        synchronized void updateFromForwardSearch(String current) {
+            if (backwardThread.getDistanceMap().containsKey(current)) {
+                int currentDistance = 
+                        forwardThread .getDistanceMap().get(current) +
+                        backwardThread.getDistanceMap().get(current);
+                
+                if (bestDistanceSoFar > currentDistance) {
+                    bestDistanceSoFar = currentDistance;
+                    touchNode = current;
+                }
+            }
+        }
+        
+        synchronized void updateFromBackwardThread(String current) {
+            if (forwardThread.getDistanceMap().containsKey(current)) {
+                int currentDistance = 
+                        forwardThread .getDistanceMap().get(current) +
+                        backwardThread.getDistanceMap().get(current);
+                
+                if (bestDistanceSoFar > currentDistance) {
+                    bestDistanceSoFar = currentDistance;
+                    touchNode = current;
+                }
+            }
+        }
+        
+        List<String> constructPath() {
+            return tracebackPath(touchNode, 
+                                 forwardThread.getParentMap(),
+                                 backwardThread.getParentMap());
+        }
+    }
+    
     /**
      * Searches for the shortest path from the Wikipedia article with the title
      * {@code sourceTitle} to the article with the title {@code  targetTitle}.
@@ -173,9 +432,9 @@ public class PathFinder {
      * @param PARENTSB the parent map of the backward search.
      * @return a shortest path.
      */
-    private List<String> tracebackPath(String touchNode, 
-                                       Map<String, String> PARENTSA, 
-                                       Map<String, String> PARENTSB) {
+    private static List<String> tracebackPath(String touchNode, 
+                                              Map<String, String> PARENTSA, 
+                                              Map<String, String> PARENTSB) {
         List<String> path = new ArrayList<>();
         String node = touchNode;
 
@@ -340,10 +599,11 @@ public class PathFinder {
     }
 
     public static void main(String[] args) throws IOException {
+        String source = args[0];
+        String target = args[1];
+        
         List<String> path = new PathFinder()
-                .findShortestPath("Disc_jockey", 
-                                  "Daft_Punk",
-                                  System.out);
+                .findShortestPathParallel(source, target, System.out);
 
         System.out.println();
         System.out.println("The shortest article path:");
