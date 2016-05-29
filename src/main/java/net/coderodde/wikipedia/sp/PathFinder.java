@@ -327,6 +327,7 @@ public class PathFinder {
      * 
      * @param sourceTitle the title of the source article.
      * @param targetTitle the title of the target article.
+     * @param out         the output stream to write the progress to.
      * @return the shortest path.
      * @throws IOException may be thrown.
      */
@@ -599,14 +600,95 @@ public class PathFinder {
     }
 
     public static void main(String[] args) throws IOException {
-        String source = args[0];
-        String target = args[1];
+        List<String> path;
+        String from = null;
+        String to   = null;
+        PrintStream out = System.out;
         
-        List<String> path = new PathFinder()
-                .findShortestPathParallel(source, target, System.out);
-
+        boolean parallel = false;
+        
+        if (args.length == 2) {
+            from = args[0];
+            to   = args[1];
+        } else if (args.length == 3) {
+            String flag = args[0];
+            
+            switch (flag) {
+                case "--no-output":
+                    out = null;
+                    break;
+                    
+                case "--parallel":
+                    parallel = true;
+                    break;
+                    
+                default:
+                    printUsageMessage();
+                    System.exit(1);
+            }
+            
+            from = args[1];
+            to   = args[2];
+        } else if (args.length == 4) {
+            String flag1 = args[0];
+            String flag2 = args[1];
+            
+            switch (flag1) {
+                case "--parallel":
+                    parallel = true;
+                    break;
+                    
+                case "--no-output":
+                    out = null;
+                    break;
+                    
+                default:
+                    printUsageMessage();
+                    System.exit(1);
+            }
+            
+            switch (flag2) {
+                case "--parallel":
+                    parallel = true;
+                    break;
+                    
+                case "--no-output":
+                    out = null;
+                    break;
+                    
+                default:
+                    printUsageMessage();
+                    System.exit(1);
+            }
+            
+            from = args[2];
+            to   = args[3];
+        }
+        
+        long startTime = System.currentTimeMillis();
+        
+        if (parallel) {
+            path = new PathFinder().findShortestPathParallel(from, to, out);
+        } else {
+            path = new PathFinder().findShortestPath(from, to, out);
+        }
+        
+        long endTime = System.currentTimeMillis();
+        
         System.out.println();
         System.out.println("The shortest article path:");
         path.forEach(System.out::println);
+        System.out.printf("Duration: %.3f seconds.\n", 
+                          (endTime - startTime) / 1000.0);
+    }
+    
+    private static void printUsageMessage() {
+        System.out.println(
+                "Usage: java -jar FILE.jar [--no-outpu] " + 
+                        "[--parallel] SOURCE TARGET");
+        System.out.println("Where: --no-output Do not print the progress.");
+        System.out.println("       --parallel  Use concurrent path finer.");
+        System.out.println("       SOURCE      The source article title.");
+        System.out.println("       TARGET      The target article title.");
     }
 }
