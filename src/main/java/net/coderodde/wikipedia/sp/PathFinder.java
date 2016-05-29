@@ -17,7 +17,10 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.util.Objects;
+import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 
 /**
@@ -48,7 +51,7 @@ public class PathFinder {
     }
 
     private static final String FORWARD_URL_FORMAT = 
-            "https://en.wikipedia.org/w/api.php" +
+            "https://fi.wikipedia.org/w/api.php" +
             "?action=query" +
             "&titles=%s" + 
             "&prop=links" + 
@@ -56,13 +59,36 @@ public class PathFinder {
             "&format=json";
 
     private static final String BACKWARD_URL_FORMAT = 
-            "https://en.wikipedia.org/w/api.php" +
+            "https://fi.wikipedia.org/w/api.php" +
             "?action=query" +
             "&list=backlinks" +
             "&bltitle=%s" + 
             "&bllimit=max" + 
             "&format=json";
 
+    private static final String BACKWARD_REQUEST_URL = 
+            "?action=query" +
+            "&list=backlinks" +
+            "&bltitle=%s" + 
+            "&bllimit=max" + 
+            "&format=json";
+            
+    private static final String FORWARD_REQUEST_URL = 
+            "?action=query" +
+            "&titles=%s" + 
+            "&prop=links" + 
+            "&pllimit=max" + 
+            "&format=json";
+    
+    
+    private static final Pattern WIKIPEDIA_URL_PATTERN = 
+            Pattern.compile("^(https://|http://)?..\\.wikipedia.org/wiki/.+$");
+            
+    private static final String HTTP_PREFIX  = "http://";
+    private static final String HTTPS_PREFIX = "https://"; 
+    private static final String API_SCRIPT   = "/w/api.php";
+    private static final String WIKI_DIR     = "/wiki/";
+    
     public List<String> findShortestPathParallel(String sourceTitle,
                                                  String targetTitle,
                                                  PrintStream out) {
@@ -661,22 +687,54 @@ public class PathFinder {
             System.exit(1);
         }
         
+        if (!isValidWikipediaURL(from)) {
+            System.err.println(
+            "[INPUT ERROR] The source URL is not a valid Wikipedia URL: \"" + 
+            from + "\".");
+            
+            System.exit(1);
+        }
+        
+        if (!isValidWikipediaURL(to)) {
+            System.err.println(
+            "[INPUT ERROR] The target URL is not a valid Wikipedia URL: \"" + 
+            to + "\".");
+            
+            System.exit(1);
+        }
+        
+        from = removeProtocolPrefix(from);
+        to   = removeProtocolPrefix(to);
+        
+        String wikipediaUrlFrom = extractWikipediaMainURL(from);
+        String wikipediaUrlTo   = extractWikipediaMainURL(to);
+        
+        if (!wikipediaUrlFrom.equals(wikipediaUrlTo)) {
+            System.err.println("[INPUT ERROR] The source and target articles " +
+                               "seem to belong to different languages: \"" +
+                               wikipediaUrlFrom + "\" versus \"" + 
+                               wikipediaUrlTo + "\".");
+            System.exit(1);
+        }
+        
+        String apiUrl = constructWikipediaAPIBaseURL(wikipedia)
+        
         long startTime = System.currentTimeMillis();
         
         if (parallel) {
-            System.out.println("[Parallel: true]");
+            System.out.println("[STATUS] Doing parallel search");
             path = new PathFinder().findShortestPathParallel(from, to, out);
         } else {
-            System.out.println("[Parallel: false]");
+            System.out.println("[STATUS] Doing equential search.");
             path = new PathFinder().findShortestPath(from, to, out);
         }
         
         long endTime = System.currentTimeMillis();
         
         System.out.println();
-        System.out.println("The shortest article path:");
+        System.out.println("[RESULT] The shortest article path:");
         path.forEach(System.out::println);
-        System.out.printf("Duration: %.3f seconds.\n", 
+        System.out.printf("[RESULT] Duration: %.3f seconds.\n", 
                           (endTime - startTime) / 1000.0);
     }
     
@@ -686,7 +744,37 @@ public class PathFinder {
                         "[--parallel] SOURCE TARGET");
         System.out.println("Where: --no-output Do not print the progress.");
         System.out.println("       --parallel  Use concurrent path finer.");
-        System.out.println("       SOURCE      The source article title.");
-        System.out.println("       TARGET      The target article title.");
+        System.out.println("       SOURCE      The source article URL.");
+        System.out.println("       TARGET      The target article URL.");
+    }
+    
+    private static String removeProtocolPrefix(String url) {
+        if (url.startsWith(HTTPS_PREFIX)) {
+            return url.substring(HTTPS_PREFIX.length());
+        }
+        
+        if (url.startsWith(HTTP_PREFIX)) {
+            return url.substring(HTTP_PREFIX.length());
+        }
+        
+        return url;
+    }
+    
+    private static String extractWikipediaMainURL(String url) {
+        int index = url.indexOf(WIKI_DIR);
+        
+        if (index < 0) {
+            throw new IllegalArgumentException("Bad Wikipedia URL: " + url);
+        }
+        
+        return url.substring(0, index);
+    }
+    
+    private static String constructWikipediaAPIBaseURL(String url) {
+        return HTTPS_PREFIX + url + API_SCRIPT;
+    }
+    
+    private static boolean isValidWikipediaURL(String url) {
+        return WIKIPEDIA_URL_PATTERN.matcher(url).matches();
     }
 }
