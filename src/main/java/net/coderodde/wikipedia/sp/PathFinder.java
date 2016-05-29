@@ -663,13 +663,18 @@ public class PathFinder {
             
             from = args[2];
             to   = args[3];
+        } else {
+            printUsageMessage();
+            System.exit(1);
         }
         
         long startTime = System.currentTimeMillis();
         
         if (parallel) {
+            System.out.println("[Parallel: true]");
             path = new PathFinder().findShortestPathParallel(from, to, out);
         } else {
+            System.out.println("[Parallel: false]");
             path = new PathFinder().findShortestPath(from, to, out);
         }
         
