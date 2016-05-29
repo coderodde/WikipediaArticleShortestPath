@@ -17,9 +17,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.util.Objects;
-import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 
@@ -84,10 +82,10 @@ public class PathFinder {
     private static final Pattern WIKIPEDIA_URL_PATTERN = 
             Pattern.compile("^(https://|http://)?..\\.wikipedia.org/wiki/.+$");
             
-    private static final String HTTP_PREFIX  = "http://";
-    private static final String HTTPS_PREFIX = "https://"; 
-    private static final String API_SCRIPT   = "/w/api.php";
-    private static final String WIKI_DIR     = "/wiki/";
+    private static final String HTTP_PREFIX    = "http://";
+    private static final String HTTPS_PREFIX   = "https://"; 
+    private static final String API_SCRIPT     = "/w/api.php";
+    private static final String WIKI_DIR_TOKEN = "/wiki/";
     
     public List<String> findShortestPathParallel(String sourceTitle,
                                                  String targetTitle,
@@ -717,7 +715,9 @@ public class PathFinder {
             System.exit(1);
         }
         
-        String apiUrl = constructWikipediaAPIBaseURL(wikipedia)
+        String apiUrl = constructWikipediaAPIBaseURL(wikipediaUrlFrom);
+        System.out.println("API URL: " + apiUrl);
+        System.exit(0);
         
         long startTime = System.currentTimeMillis();
         
@@ -761,13 +761,7 @@ public class PathFinder {
     }
     
     private static String extractWikipediaMainURL(String url) {
-        int index = url.indexOf(WIKI_DIR);
-        
-        if (index < 0) {
-            throw new IllegalArgumentException("Bad Wikipedia URL: " + url);
-        }
-        
-        return url.substring(0, index);
+        return url.substring(0, url.indexOf(WIKI_DIR_TOKEN));
     }
     
     private static String constructWikipediaAPIBaseURL(String url) {
