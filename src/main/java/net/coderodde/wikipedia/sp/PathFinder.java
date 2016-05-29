@@ -172,7 +172,7 @@ public class PathFinder {
                         out.println("Forward:  " + current);
                     }
                     
-                    touchNodeHolder.updateFromForwardSearch(current, DISTANCE.get(current));
+                    touchNodeHolder.updateFromForwardSearch(current);
                     
                     if (touchNodeHolder.pathIsOptimal(current)) {
                         return;
@@ -242,7 +242,7 @@ public class PathFinder {
                         out.println("Backward: " + current);
                     }
                     
-                    touchNodeHolder.updateFromBackwardThread(current, DISTANCE.get(current));
+                    touchNodeHolder.updateFromBackwardThread(current);
                     
                     if (touchNodeHolder.pathIsOptimal(current)) {
                         return;
@@ -304,7 +304,7 @@ public class PathFinder {
             return false;
         }
         
-        synchronized void updateFromForwardSearch(String current, int distance) {
+        synchronized void updateFromForwardSearch(String current) {
             if (backwardThread.getDistanceMap().containsKey(current)) {
                 int currentDistance = 
                         forwardThread .getDistanceMap().get(current) +
@@ -317,7 +317,7 @@ public class PathFinder {
             }
         }
         
-        synchronized void updateFromBackwardThread(String current, int distance) {
+        synchronized void updateFromBackwardThread(String current) {
             if (forwardThread.getDistanceMap().containsKey(current)) {
                 int currentDistance = 
                         forwardThread .getDistanceMap().get(current) +
