@@ -22,7 +22,7 @@ public class WikipediaURLHandler {
     /**
      * Caches the basic Wikipedia article URL. For example, the basic URL of
      * <tt>https://en.wikipedia.org/wiki/Disc_jockey</tt> is
-     * <tt>https://en.wikipedia.org</tt>.
+     * <tt>en.wikipedia.org</tt>.
      */
     private final String basicUrl;
     
@@ -31,6 +31,13 @@ public class WikipediaURLHandler {
      * <a href="https://www.mediawiki.org/wiki/API:Main_page">Wikipedia API</a>.
      */
     private final String apiUrl;
+    
+    /**
+     * Caches the title of the article. For example, for the Wikipedia article
+     * <tt>https://en.wikipedia.org/wiki/Disc_jockey</tt>, the title is
+     * <tt>Disc_jockey</tt>.
+     */
+    private final String title;
     
     /**
      * Parses {@code wikipediaUrl} and constructs this class.
@@ -48,6 +55,9 @@ public class WikipediaURLHandler {
         this.apiUrl   = constructAPIURL(wikipediaUrl);
         this.basicUrl = 
                 wikipediaUrl.substring(0, wikipediaUrl.indexOf(WIKI_DIR_TOKEN));
+        this.title    = 
+                wikipediaUrl.substring(wikipediaUrl
+                                       .lastIndexOf(WIKI_DIR_TOKEN));
     }
     
     /**
@@ -62,6 +72,10 @@ public class WikipediaURLHandler {
     
     public String getBasicURL() {
         return this.basicUrl;
+    }
+    
+    public String getTitle() {
+        return this.title;
     }
     
     private String removeProtocolPrefix(String url) {

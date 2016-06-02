@@ -13,18 +13,20 @@ public class WikipediaURLHandlerTest {
         
         assertEquals("en.wikipedia.org", handler.getBasicURL());
         assertEquals("https://en.wikipedia.org/w/api.php", handler.getAPIURL());
-        
+        assertEquals("Funk", handler.getTitle());
         handler = 
                 new WikipediaURLHandler("http://fi.wikipedia.org/wiki/Fankki");
         
         assertEquals("fi.wikipedia.org", handler.getBasicURL());
         assertEquals("https://fi.wikipedia.org/w/api.php", handler.getAPIURL());
+        assertEquals("Fankki", handler.getTitle());
         
         handler = 
                 new WikipediaURLHandler("de.wikipedia.org/wiki/Das_Funk");
         
         assertEquals("de.wikipedia.org", handler.getBasicURL());
         assertEquals("https://de.wikipedia.org/w/api.php", handler.getAPIURL());
+        assertEquals("Das_Funk", handler.getTitle());
     }
         
     @Test(expected = IllegalArgumentException.class) 

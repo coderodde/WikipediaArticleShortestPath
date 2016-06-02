@@ -4,6 +4,8 @@ import java.util.List;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.regex.Pattern;
+import net.coderodde.wikipedia.sp.support.BidirectionalWikipediaShortestPathFinder;
+import net.coderodde.wikipedia.sp.support.ParallelBidirectionalWikipediaShortestPathFinder;
 
 /**
  * This class implements an unweighted shortest path finder in the Wikipedia 
@@ -54,137 +56,115 @@ public class Main {
     private static final String WIKI_DIR_TOKEN = "/wiki/";
     
     public static void main(String[] args) throws IOException {
-        List<String> path;
-        String from = null;
-        String to   = null;
-        PrintStream out = System.out;
-        
-        boolean parallel = false;
-        
-        if (args.length == 2) {
-            from = args[0];
-            to   = args[1];
-        } else if (args.length == 3) {
-            String flag = args[0];
-            
-            switch (flag) {
-                case "--no-output":
-                    out = null;
-                    break;
-                    
-                case "--parallel":
-                    parallel = true;
-                    break;
-                    
-                default:
-                    printUsageMessage();
-                    System.exit(1);
-            }
-            
-            from = args[1];
-            to   = args[2];
-        } else if (args.length == 4) {
-            String flag1 = args[0];
-            String flag2 = args[1];
-            
-            switch (flag1) {
-                case "--parallel":
-                    parallel = true;
-                    break;
-                    
-                case "--no-output":
-                    out = null;
-                    break;
-                    
-                default:
-                    printUsageMessage();
-                    System.exit(1);
-            }
-            
-            switch (flag2) {
-                case "--parallel":
-                    parallel = true;
-                    break;
-                    
-                case "--no-output":
-                    out = null;
-                    break;
-                    
-                default:
-                    printUsageMessage();
-                    System.exit(1);
-            }
-            
-            from = args[2];
-            to   = args[3];
-        } else {
+        if (args.length < 2) {
             printUsageMessage();
-            System.exit(1);
+            return;
         }
         
-        if (!isValidWikipediaURL(from)) {
-            System.err.println(
-            "[INPUT ERROR] The source URL is not a valid Wikipedia URL: \"" + 
-            from + "\".");
-            
-            System.exit(1);
+        String fromUrl;
+        String toUrl;
+        boolean noOutput = false;
+        boolean serial   = false;
+        
+        switch (args.length) {
+            case 2:
+                fromUrl = args[0];
+                toUrl   = args[1];
+                break;
+                
+            case 3:
+                switch (args[0]) {
+                    case "--no-output":
+                        noOutput = true;
+                        break;
+                        
+                    case "--serial":
+                        serial = true;
+                        break;
+                        
+                    default:
+                        printUsageMessage();
+                        return;
+                }
+                
+                fromUrl = args[1];
+                toUrl   = args[2];
+                break;
+                
+            case 4:
+                switch (args[0]) {
+                    case "--no-output":
+                        noOutput = true;
+                        break;
+                        
+                    case "--serial":
+                        serial = true;
+                        break;
+                        
+                    default:
+                        printUsageMessage();
+                        return;
+                }
+                
+                switch (args[1]) {
+                    case "--no-output":
+                        noOutput = true;
+                        break;
+                        
+                    case "--serial":
+                        serial = true;
+                        break;
+                        
+                    default:
+                        printUsageMessage();
+                        return;
+                }
+                
+                fromUrl = args[2];
+                toUrl   = args[3];
+                break;
+                
+            default:
+                printUsageMessage();
+                return;
         }
         
-        if (!isValidWikipediaURL(to)) {
-            System.err.println(
-            "[INPUT ERROR] The target URL is not a valid Wikipedia URL: \"" + 
-            to + "\".");
-            
-            System.exit(1);
+        WikipediaURLHandler fromUrlHandler;
+        WikipediaURLHandler toUrlHandler;
+        
+        try {
+            fromUrlHandler = new WikipediaURLHandler(toUrl);
+            toUrlHandler   = new WikipediaURLHandler(fromUrl);
+        } catch (IllegalArgumentException ex) {
+            System.err.println(ex.getMessage());
+            return;
+        }            
+        
+        if (!fromUrlHandler.getBasicURL().equals(toUrlHandler.getBasicURL())) {
+            System.out.println("[ERROR] The source and target articles seem " +
+                               "to be written in different languages.");
+            return;
         }
         
-        from = removeProtocolPrefix(from);
-        to   = removeProtocolPrefix(to);
+        PrintStream out = noOutput ? null : System.out;
+        AbstractWikipediaShortestPathFinder finder = serial ? 
+                new BidirectionalWikipediaShortestPathFinder() :
+                new ParallelBidirectionalWikipediaShortestPathFinder();
         
-        String wikipediaUrlFrom = extractWikipediaMainURL(from);
-        String wikipediaUrlTo   = extractWikipediaMainURL(to);
+        List<String> path = finder.search(fromUrlHandler.getTitle(),
+                                          toUrlHandler.getTitle(), 
+                                          fromUrlHandler.getAPIURL(), 
+                                          out);
         
-        if (!wikipediaUrlFrom.equals(wikipediaUrlTo)) {
-            System.err.println("[INPUT ERROR] The source and target articles " +
-                               "seem to belong to different languages: \"" +
-                               wikipediaUrlFrom + "\" versus \"" + 
-                               wikipediaUrlTo + "\".");
-            System.exit(1);
-        }
-        
-        String apiUrl = constructWikipediaAPIBaseURL(wikipediaUrlFrom);
-        System.out.println("API URL: " + apiUrl);
-//        System.exit(0);
-        
-        to = to.substring(to.lastIndexOf("/") + 1);
-        from = from.substring(from.lastIndexOf("/") + 1);
-        
-        long startTime = System.currentTimeMillis();
-        parallel = true;
-        
-        if (parallel) {
-            System.out.println("[STATUS] Doing parallel search");
-//            path = new Main().findShortestPathParallel(from, to, out);
-        } else {
-            System.out.println("[STATUS] Doing equential search.");
-//            path = new Main().findShortestPath(from, to, out);
-        }
-        
-        long endTime = System.currentTimeMillis();
-        
-        System.out.println();
-        System.out.println("[RESULT] The shortest article path:");
-//        path.forEach(System.out::println);
-        System.out.printf("[RESULT] Duration: %.3f seconds.\n", 
-                          (endTime - startTime) / 1000.0);
+        path.forEach(System.out::println);
     }
     
     private static void printUsageMessage() {
         System.out.println(
-                "Usage: java -jar FILE.jar [--no-outpu] " + 
-                        "[--parallel] SOURCE TARGET");
+                "Usage: java -jar FILE.jar [--no_output] " + 
+                        "[--serial] SOURCE TARGET");
         System.out.println("Where: --no-output Do not print the progress.");
-        System.out.println("       --parallel  Use concurrent path finer.");
+        System.out.println("       --serial    Use non-parallel path finer.");
         System.out.println("       SOURCE      The source article URL.");
         System.out.println("       TARGET      The target article URL.");
     }
