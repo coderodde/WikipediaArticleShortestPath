@@ -117,7 +117,7 @@ extends AbstractWikipediaShortestPathFinder {
                 String current = QUEUE.removeFirst();
 
                 if (out != null) {
-                    out.println("[Forward:  " + current + "]");
+                    out.println("[Forward search expanding:  " + current + "]");
                 }
 
                 touchNodeHolder.updateFromForwardSearch(current);
@@ -182,7 +182,7 @@ extends AbstractWikipediaShortestPathFinder {
                 String current = QUEUE.removeFirst();
 
                 if (out != null) {
-                    out.println("Backward: " + current);
+                    out.println("[Backward search expanding: " + current + "]");
                 }
 
                 touchNodeHolder.updateFromBackwardThread(current);

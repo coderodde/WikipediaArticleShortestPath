@@ -78,7 +78,6 @@ public abstract class AbstractWikipediaShortestPathFinder {
                                         String targetTitle,
                                         String apiUrlText,
                                         PrintStream out);
-    
         
     /**
      * Constructs the shortest path.
@@ -154,9 +153,9 @@ public abstract class AbstractWikipediaShortestPathFinder {
     /**
      * Returns all the child articles that are linked from URL {@code current}.
      * 
+     * @param apiUrl  the URL to the Wikipedia API.
      * @param current the URL of the current Wikipedia article.
      * @return the list of URLs that are pointed by {@code current}.
-     * @throws IOException may be thrown.
      */
     protected static List<String> getChildArticles(String apiUrl,
                                                    String current) {
@@ -166,9 +165,9 @@ public abstract class AbstractWikipediaShortestPathFinder {
     /**
      * Returns all the parent articles that are linking to {@code current}.
      * 
+     * @param apiUrl  the URL to the Wikipedia API.
      * @param current the URL of the current Wikipedia article.
      * @return the list of URLs that are pointing to {@code current}.
-     * @throws IOException may be thrown.
      */
     protected static List<String> getParentArticles(String apiUrl,
                                                     String current) {
@@ -185,7 +184,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
      */
     private static List<String> extractForwardLinkTitles(String jsonText) {
         List<String> linkNameList = new ArrayList<>();
-        JsonArray linkNameArray = null;
+        JsonArray linkNameArray;
 
         try {
             JsonObject root = new JsonParser().parse(jsonText).getAsJsonObject();
@@ -226,7 +225,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
      */
     private static List<String> extractBackwardLinkTitles(String jsonText) {
         List<String> linkNameList = new ArrayList<>();
-        JsonArray backLinkArray = null;
+        JsonArray backLinkArray;
 
         try {
             JsonObject root = new JsonParser().parse(jsonText).getAsJsonObject();

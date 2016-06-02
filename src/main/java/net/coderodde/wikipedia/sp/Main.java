@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  * @author Rodion "rodde" Efremov
  * @version 1.6 (May 28, 2016)
  */
-public class PathFinder {
+public class Main {
 
 
     private static final String FORWARD_URL_FORMAT = 
@@ -164,17 +164,17 @@ public class PathFinder {
         
         if (parallel) {
             System.out.println("[STATUS] Doing parallel search");
-            path = new PathFinder().findShortestPathParallel(from, to, out);
+//            path = new Main().findShortestPathParallel(from, to, out);
         } else {
             System.out.println("[STATUS] Doing equential search.");
-            path = new PathFinder().findShortestPath(from, to, out);
+//            path = new Main().findShortestPath(from, to, out);
         }
         
         long endTime = System.currentTimeMillis();
         
         System.out.println();
         System.out.println("[RESULT] The shortest article path:");
-        path.forEach(System.out::println);
+//        path.forEach(System.out::println);
         System.out.printf("[RESULT] Duration: %.3f seconds.\n", 
                           (endTime - startTime) / 1000.0);
     }

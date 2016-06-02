@@ -11,27 +11,22 @@ public class WikipediaURLHandlerTest {
     public void testValid() {
         handler = new WikipediaURLHandler("https://en.wikipedia.org/wiki/Funk");
         
-        assertEquals("en", handler.getLanguageIdentifier());
+        assertEquals("en.wikipedia.org", handler.getBasicURL());
         assertEquals("https://en.wikipedia.org/w/api.php", handler.getAPIURL());
         
         handler = 
                 new WikipediaURLHandler("http://fi.wikipedia.org/wiki/Fankki");
         
-        assertEquals("fi", handler.getLanguageIdentifier());
+        assertEquals("fi.wikipedia.org", handler.getBasicURL());
         assertEquals("https://fi.wikipedia.org/w/api.php", handler.getAPIURL());
         
         handler = 
                 new WikipediaURLHandler("de.wikipedia.org/wiki/Das_Funk");
         
-        assertEquals("de", handler.getLanguageIdentifier());
+        assertEquals("de.wikipedia.org", handler.getBasicURL());
         assertEquals("https://de.wikipedia.org/w/api.php", handler.getAPIURL());
     }
-    
-    @Test(expected = IllegalArgumentException.class) 
-    public void testInvalidProtocolPrefix() {
-        new WikipediaURLHandler("htps://en.wikipedia.org/wiki/Funk");
-    }
-    
+        
     @Test(expected = IllegalArgumentException.class) 
     public void testMisspelledWikipedia() {
         new WikipediaURLHandler("en.wikpedia.org/wiki/Funk");
