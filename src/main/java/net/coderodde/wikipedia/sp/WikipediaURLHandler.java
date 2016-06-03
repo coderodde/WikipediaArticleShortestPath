@@ -11,13 +11,13 @@ import java.util.regex.Pattern;
  */
 public class WikipediaURLHandler {
 
-    private static final Pattern WIKIPEDIA_URL_PATTERN = 
+    public static final Pattern WIKIPEDIA_URL_PATTERN = 
             Pattern.compile("^(https://|http://)?..+\\.wikipedia.org/wiki/.+$");
     
-    private static final String HTTPS_PROTOCOL_PREFIX = "https://";
-    private static final String HTTP_PROTOCOL_PREFIX  = "http://";    
-    private static final String WIKI_DIR_TOKEN        = "/wiki/";
-    private static final String API_SCRIPT_DIR_TOKEN  = "/w/api.php";
+    public static final String HTTPS_PROTOCOL_PREFIX = "https://";
+    public static final String HTTP_PROTOCOL_PREFIX  = "http://";    
+    public static final String WIKI_DIR_TOKEN        = "/wiki/";
+    public static final String API_SCRIPT_DIR_TOKEN  = "/w/api.php";
     
     /**
      * Caches the basic Wikipedia article URL. For example, the basic URL of
