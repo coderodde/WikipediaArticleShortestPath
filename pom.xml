@@ -42,7 +42,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>1.5.0</version>
                 <configuration>
-                    <mainClass>net.coderodde.wikipedia.sp.PathFinder</mainClass>
+                    <mainClass>net.coderodde.wikipedia.sp.Main</mainClass>
                 </configuration>
             </plugin>
             
@@ -51,7 +51,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>net.coderodde.wikipedia.sp.PathFinder</mainClass>
+                            <mainClass>net.coderodde.wikipedia.sp.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

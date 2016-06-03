@@ -57,7 +57,8 @@ public class WikipediaURLHandler {
                 wikipediaUrl.substring(0, wikipediaUrl.indexOf(WIKI_DIR_TOKEN));
         this.title    = 
                 wikipediaUrl.substring(wikipediaUrl
-                                       .lastIndexOf(WIKI_DIR_TOKEN));
+                                       .indexOf(WIKI_DIR_TOKEN) + 
+                                       WIKI_DIR_TOKEN.length());
     }
     
     /**

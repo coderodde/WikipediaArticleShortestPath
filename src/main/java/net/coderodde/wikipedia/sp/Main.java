@@ -151,8 +151,14 @@ public class Main {
                 new BidirectionalWikipediaShortestPathFinder() :
                 new ParallelBidirectionalWikipediaShortestPathFinder();
         
-        List<String> path = finder.search(fromUrlHandler.getTitle(),
-                                          toUrlHandler.getTitle(), 
+        String sourceTitle = fromUrlHandler.getTitle();
+        String targetTitle = toUrlHandler.getTitle();
+        
+        System.out.println("From: " + sourceTitle);
+        System.out.println("To:   " + targetTitle);
+        
+        List<String> path = finder.search(sourceTitle,
+                                          targetTitle, 
                                           fromUrlHandler.getAPIURL(), 
                                           out);
         
@@ -167,29 +173,5 @@ public class Main {
         System.out.println("       --serial    Use non-parallel path finer.");
         System.out.println("       SOURCE      The source article URL.");
         System.out.println("       TARGET      The target article URL.");
-    }
-    
-    private static String removeProtocolPrefix(String url) {
-        if (url.startsWith(HTTPS_PREFIX)) {
-            return url.substring(HTTPS_PREFIX.length());
-        }
-        
-        if (url.startsWith(HTTP_PREFIX)) {
-            return url.substring(HTTP_PREFIX.length());
-        }
-        
-        return url;
-    }
-    
-    private static String extractWikipediaMainURL(String url) {
-        return url.substring(0, url.indexOf(WIKI_DIR_TOKEN));
-    }
-    
-    private static String constructWikipediaAPIBaseURL(String url) {
-        return HTTPS_PREFIX + url + API_SCRIPT;
-    }
-    
-    private static boolean isValidWikipediaURL(String url) {
-        return WIKIPEDIA_URL_PATTERN.matcher(url).matches();
     }
 }

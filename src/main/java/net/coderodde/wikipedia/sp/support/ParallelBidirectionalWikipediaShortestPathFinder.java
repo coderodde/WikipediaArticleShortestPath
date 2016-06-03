@@ -5,6 +5,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,35 +22,41 @@ public final class ParallelBidirectionalWikipediaShortestPathFinder
 extends AbstractWikipediaShortestPathFinder {
 
     /**
+     * Since {@link java.util.concurrent.ConcurrentHashMap} does not allow 
+     * {@code null} values, we need a token representing the {@code null}.
+     */
+    private static final String PARENT_MAP_END_TOKEN = "";
+    
+    /**
      * Searches for the shortest path from the Wikipedia article with the title
      * {@code sourceTitle} to the article with the title {@code targetTitle}.
      * The algorithm is a parallel bidirectional breadth-first search running 
      * each of the two search frontiers in their own threads.
      * 
-     * @param sourceTitle the title of the source article.
-     * @param targetTitle the title of the target article.
+     * @param source the title of the source article.
+     * @param target the title of the target article.
      * @param apiUrlText  the Wikipedia API access URL text.
      * @param out         the output stream to write the progress to.
      * @return the shortest path.
      */
     @Override
-    public List<String> search(String sourceTitle,
-                               String targetTitle, 
+    public List<String> search(String source,
+                               String target, 
                                String apiUrlText, 
                                PrintStream out) {
     
-        if (sourceTitle.equals(targetTitle)) {
-            return new ArrayList<>(Arrays.asList(sourceTitle));
+        if (source.equals(target)) {
+            return new ArrayList<>(Arrays.asList(source));
         }
         
-        TouchNodeHolder touchNodeHolder = new TouchNodeHolder();
+        TouchNodeHolder touchNodeHolder = new TouchNodeHolder(source, target);
         
-        ForwardThread forwardThread = new ForwardThread(sourceTitle,
+        ForwardThread forwardThread = new ForwardThread(source,
                                                         apiUrlText,
                                                         touchNodeHolder,
                                                         out);
         
-        BackwardThread backwardThread = new BackwardThread(targetTitle,
+        BackwardThread backwardThread = new BackwardThread(target,
                                                            apiUrlText,
                                                            touchNodeHolder,
                                                            out);
@@ -91,7 +98,7 @@ extends AbstractWikipediaShortestPathFinder {
             this.out = out;
             
             QUEUE.add(sourceTitle);
-            PARENTS.put(sourceTitle, null);
+            PARENTS.put(sourceTitle, PARENT_MAP_END_TOKEN);
             DISTANCE.put(sourceTitle, 0);
         }
         
@@ -156,7 +163,7 @@ extends AbstractWikipediaShortestPathFinder {
             this.out = out;
             
             QUEUE.add(targetTitle);
-            PARENTS.put(targetTitle, null);
+            PARENTS.put(targetTitle, PARENT_MAP_END_TOKEN);
             DISTANCE.put(targetTitle, 0);
         }
         
@@ -206,8 +213,15 @@ extends AbstractWikipediaShortestPathFinder {
         
         private ForwardThread forwardThread;
         private BackwardThread backwardThread;
+        private String source;
+        private String target;
         private volatile String touchNode;
         private volatile int bestDistanceSoFar = Integer.MAX_VALUE;
+        
+        TouchNodeHolder(String source, String target) {
+            this.source = source;
+            this.target = target;
+        }
         
         void setForwardThread(ForwardThread forwardThread) {
             this.forwardThread = forwardThread;
@@ -269,9 +283,18 @@ extends AbstractWikipediaShortestPathFinder {
         }
         
         synchronized List<String> constructPath() {
+            Map<String, String> forwardParents;
+            Map<String, String> backwardParents;
+            
+            forwardParents  = new HashMap<>(forwardThread .getParentMap());
+            backwardParents = new HashMap<>(backwardThread.getParentMap()); 
+            
+            forwardParents .put(source, null);
+            backwardParents.put(target, null);
+            
             return tracebackPath(touchNode, 
-                                 forwardThread.getParentMap(),
-                                 backwardThread.getParentMap());
+                                 forwardParents,
+                                 backwardParents);
         }
     }
 }
