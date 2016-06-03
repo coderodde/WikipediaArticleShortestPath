@@ -3,7 +3,6 @@ package net.coderodde.wikipedia.sp;
 import java.util.List;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.regex.Pattern;
 import net.coderodde.wikipedia.sp.support.BidirectionalWikipediaShortestPathFinder;
 import net.coderodde.wikipedia.sp.support.ParallelBidirectionalWikipediaShortestPathFinder;
 
@@ -15,46 +14,6 @@ import net.coderodde.wikipedia.sp.support.ParallelBidirectionalWikipediaShortest
  */
 public class Main {
 
-
-    private static final String FORWARD_URL_FORMAT = 
-            "https://fi.wikipedia.org/w/api.php" +
-            "?action=query" +
-            "&titles=%s" + 
-            "&prop=links" + 
-            "&pllimit=max" + 
-            "&format=json";
-
-    private static final String BACKWARD_URL_FORMAT = 
-            "https://fi.wikipedia.org/w/api.php" +
-            "?action=query" +
-            "&list=backlinks" +
-            "&bltitle=%s" + 
-            "&bllimit=max" + 
-            "&format=json";
-
-    private static final String BACKWARD_REQUEST_URL = 
-            "?action=query" +
-            "&list=backlinks" +
-            "&bltitle=%s" + 
-            "&bllimit=max" + 
-            "&format=json";
-            
-    private static final String FORWARD_REQUEST_URL = 
-            "?action=query" +
-            "&titles=%s" + 
-            "&prop=links" + 
-            "&pllimit=max" + 
-            "&format=json";
-    
-    
-    private static final Pattern WIKIPEDIA_URL_PATTERN = 
-            Pattern.compile("^(https://|http://)?..\\.wikipedia.org/wiki/.+$");
-            
-    private static final String HTTP_PREFIX    = "http://";
-    private static final String HTTPS_PREFIX   = "https://"; 
-    private static final String API_SCRIPT     = "/w/api.php";
-    private static final String WIKI_DIR_TOKEN = "/wiki/";
-    
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
             printUsageMessage();
@@ -133,8 +92,8 @@ public class Main {
         WikipediaURLHandler toUrlHandler;
         
         try {
-            fromUrlHandler = new WikipediaURLHandler(toUrl);
-            toUrlHandler   = new WikipediaURLHandler(fromUrl);
+            fromUrlHandler = new WikipediaURLHandler(fromUrl);
+            toUrlHandler   = new WikipediaURLHandler(toUrl);
         } catch (IllegalArgumentException ex) {
             System.err.println(ex.getMessage());
             return;
@@ -146,6 +105,10 @@ public class Main {
             return;
         }
         
+        System.out.println("[STATUS] Searching from \"" + fromUrl + "\" to \"" +
+                           toUrl + "\" using " +
+                           (serial ? "serial " : "parallel ") + "algorithm.");
+        
         PrintStream out = noOutput ? null : System.out;
         AbstractWikipediaShortestPathFinder finder = serial ? 
                 new BidirectionalWikipediaShortestPathFinder() :
@@ -153,9 +116,6 @@ public class Main {
         
         String sourceTitle = fromUrlHandler.getTitle();
         String targetTitle = toUrlHandler.getTitle();
-        
-        System.out.println("From: " + sourceTitle);
-        System.out.println("To:   " + targetTitle);
         
         List<String> path = finder.search(sourceTitle,
                                           targetTitle, 

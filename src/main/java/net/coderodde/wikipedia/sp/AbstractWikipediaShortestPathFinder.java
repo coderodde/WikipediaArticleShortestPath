@@ -26,22 +26,6 @@ import org.apache.commons.io.IOUtils;
 public abstract class AbstractWikipediaShortestPathFinder {
     
     private static final Map<Character, String> ENCODING_MAP = new HashMap<>();
-    
-    private static final String FORWARD_URL_FORMAT = 
-            "https://fi.wikipedia.org/w/api.php" +
-            "?action=query" +
-            "&titles=%s" + 
-            "&prop=links" + 
-            "&pllimit=max" + 
-            "&format=json";
-
-    private static final String BACKWARD_URL_FORMAT = 
-            "https://fi.wikipedia.org/w/api.php" +
-            "?action=query" +
-            "&list=backlinks" +
-            "&bltitle=%s" + 
-            "&bllimit=max" + 
-            "&format=json";
 
     private static final String BACKWARD_REQUEST_URL = 
             "?action=query" +
@@ -125,11 +109,12 @@ public abstract class AbstractWikipediaShortestPathFinder {
         String jsonDataUrl;
         
         try {
-            jsonDataUrl = String.format(forward ? 
-                                            FORWARD_URL_FORMAT : 
-                                            BACKWARD_URL_FORMAT,
-                                        URLEncoder.encode(currentTitle, 
-                                                          "UTF-8"));
+            jsonDataUrl = 
+                    apiUrl + String.format(forward ? 
+                                                FORWARD_REQUEST_URL : 
+                                                BACKWARD_REQUEST_URL, 
+                                           URLEncoder.encode(currentTitle, 
+                                                             "UTF-8"));
         } catch (UnsupportedEncodingException ex) {
             throw new IllegalStateException(ex.getMessage(), ex);
         }
