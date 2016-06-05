@@ -117,17 +117,15 @@ public class Main {
         String sourceTitle = fromUrlHandler.getTitle();
         String targetTitle = toUrlHandler.getTitle();
         
-        long startTime = System.currentTimeMillis();
-        
         List<String> path = finder.search(sourceTitle,
                                           targetTitle, 
                                           fromUrlHandler.getAPIURL(), 
                                           out);
         
-        long endTime = System.currentTimeMillis();
-        
-        System.out.println("[RESULT] The search took " + (endTime - startTime) +
-                           " milliseconds.");
+        System.out.println("[RESULT] The search took " + finder.getDuration() +
+                           " milliseconds, expanding " + 
+                           finder.getNumberOfExpandedNodes() + 
+                           " nodes.");
         
         path.forEach(System.out::println);
     }

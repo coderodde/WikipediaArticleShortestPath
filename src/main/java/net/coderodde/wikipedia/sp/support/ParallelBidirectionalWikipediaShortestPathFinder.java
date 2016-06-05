@@ -44,11 +44,14 @@ extends AbstractWikipediaShortestPathFinder {
                                String target, 
                                String apiUrlText, 
                                PrintStream out) {
-    
+        this.numberOfExpandedNodes = 0;
+        this.duration = 0L;
+        
         if (source.equals(target)) {
             return new ArrayList<>(Arrays.asList(source));
         }
         
+        this.duration = System.currentTimeMillis();
         TouchNodeHolder touchNodeHolder = new TouchNodeHolder(source, target);
         
         ForwardThread forwardThread = new ForwardThread(source,
@@ -76,7 +79,12 @@ extends AbstractWikipediaShortestPathFinder {
                             ex.getMessage(), ex);
         }
         
-        return touchNodeHolder.constructPath();    
+        List<String> path = touchNodeHolder.constructPath();
+        this.numberOfExpandedNodes = forwardThread.getNumberOfExpandedNodes() +
+                                    backwardThread.getNumberOfExpandedNodes();
+        
+        this.duration = System.currentTimeMillis() - this.duration;
+        return path;  
     }
     
     private static class ForwardThread extends Thread {
@@ -88,6 +96,7 @@ extends AbstractWikipediaShortestPathFinder {
         private final String apiUrlText;
         private final PrintStream out;
         private volatile boolean exit;
+        private int numberOfExpandedNodes;
         
         ForwardThread(String sourceTitle, 
                       String apiUrlText,
@@ -114,6 +123,10 @@ extends AbstractWikipediaShortestPathFinder {
             exit = true;
         }
         
+        int getNumberOfExpandedNodes() {
+            return this.numberOfExpandedNodes;
+        }
+        
         @Override
         public void run() {
             while (!QUEUE.isEmpty()) {
@@ -122,7 +135,7 @@ extends AbstractWikipediaShortestPathFinder {
                 }
 
                 String current = QUEUE.removeFirst();
-
+                
                 if (out != null) {
                     out.println("[Forward search expanding:  " + current + "]");
                 }
@@ -132,6 +145,8 @@ extends AbstractWikipediaShortestPathFinder {
                 if (touchNodeHolder.pathIsOptimal(current)) {
                     return;
                 }
+                
+                numberOfExpandedNodes++;
 
                 for (String child : getChildArticles(apiUrlText, current)) {
                     if (!PARENTS.containsKey(child)) {
@@ -149,10 +164,11 @@ extends AbstractWikipediaShortestPathFinder {
         private final Deque<String> QUEUE = new ArrayDeque<>();
         private final Map<String, String> PARENTS = new ConcurrentHashMap<>();
         private final Map<String, Integer> DISTANCE = new ConcurrentHashMap<>();
+        private final TouchNodeHolder touchNodeHolder;
         private final String apiUrlText;
         private final PrintStream out;
         private volatile boolean exit;
-        private final TouchNodeHolder touchNodeHolder;
+        private int numberOfExpandedNodes;
         
         BackwardThread(String targetTitle, 
                        String apiUrlText,
@@ -179,6 +195,10 @@ extends AbstractWikipediaShortestPathFinder {
             exit = true;
         }
         
+        int getNumberOfExpandedNodes() {
+            return this.numberOfExpandedNodes;
+        }
+        
         @Override
         public void run() {
             while (!QUEUE.isEmpty()) {
@@ -187,7 +207,7 @@ extends AbstractWikipediaShortestPathFinder {
                 }
 
                 String current = QUEUE.removeFirst();
-
+                
                 if (out != null) {
                     out.println("[Backward search expanding: " + current + "]");
                 }
@@ -197,6 +217,8 @@ extends AbstractWikipediaShortestPathFinder {
                 if (touchNodeHolder.pathIsOptimal(current)) {
                     return;
                 }
+                
+                numberOfExpandedNodes++;
 
                 for (String parent : getParentArticles(apiUrlText, current)) {
                     if (!PARENTS.containsKey(parent)) {
@@ -213,8 +235,8 @@ extends AbstractWikipediaShortestPathFinder {
         
         private ForwardThread forwardThread;
         private BackwardThread backwardThread;
-        private String source;
-        private String target;
+        private final String source;
+        private final String target;
         private volatile String touchNode;
         private volatile int bestDistanceSoFar = Integer.MAX_VALUE;
         

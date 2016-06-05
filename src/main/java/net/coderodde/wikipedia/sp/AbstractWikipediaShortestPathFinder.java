@@ -58,11 +58,39 @@ public abstract class AbstractWikipediaShortestPathFinder {
         ENCODING_MAP.put('?', "%3F");
     }
     
+    /**
+     * Caches the duration of the previous search in milliseconds.
+     */
+    protected long duration;
+    
+    /**
+     * Caches the number of expanded nodes in the previous search.
+     */
+    protected int numberOfExpandedNodes;
+    
     public abstract List<String> search(String sourceTitle, 
                                         String targetTitle,
                                         String apiUrlText,
                                         PrintStream out);
         
+    /**
+     * Returns the duration of the search in milliseconds.
+     * 
+     * @return the duration of the search.
+     */
+    public long getDuration() {
+        return duration;
+    }
+    
+    /**
+     * Returns the number of expanded nodes.
+     * 
+     * @return the number of expanded nodes.
+     */
+    public int getNumberOfExpandedNodes() {
+        return numberOfExpandedNodes;
+    }
+    
     /**
      * Constructs the shortest path.
      * 
