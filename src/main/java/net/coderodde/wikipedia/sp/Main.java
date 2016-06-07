@@ -135,7 +135,7 @@ public class Main {
                 "Usage: java -jar FILE.jar [--no_output] " + 
                         "[--serial] SOURCE TARGET");
         System.out.println("Where: --no-output Do not print the progress.");
-        System.out.println("       --serial    Use non-parallel path finer.");
+        System.out.println("       --serial    Use non-parallel path finder.");
         System.out.println("       SOURCE      The source article URL.");
         System.out.println("       TARGET      The target article URL.");
     }
