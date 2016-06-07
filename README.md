@@ -8,4 +8,4 @@ where
 - `SOURCE` is the source Wikipedia article title,
 - `TARGET` is the target Wikipedia article title,
 - `--no-output` removes the progress output,
-- `--parallel` runs the search in two threads instead of one.
+- `--serial` runs the single-threaded search; if omitted, a parallel search is used.
