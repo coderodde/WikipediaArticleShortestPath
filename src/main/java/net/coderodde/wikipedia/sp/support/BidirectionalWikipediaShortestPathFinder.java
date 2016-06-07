@@ -19,7 +19,7 @@ import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
  */
 public final class BidirectionalWikipediaShortestPathFinder 
 extends AbstractWikipediaShortestPathFinder {
-    
+
     /**
      * Searches for the shortest path from the Wikipedia article with the title
      * {@code sourceTitle} to the article with the title {@code targetTitle}.
@@ -38,13 +38,13 @@ extends AbstractWikipediaShortestPathFinder {
                                PrintStream out) {
         this.numberOfExpandedNodes = 0;
         this.duration = 0L;
-        
+
         if (sourceTitle.equals(targetTitle)) {
             return new ArrayList<>(Arrays.asList(sourceTitle));
         }
 
         this.duration = System.currentTimeMillis();
-        
+
         Deque<String> QUEUEA = new ArrayDeque<>();
         Deque<String> QUEUEB = new ArrayDeque<>();
 
@@ -83,7 +83,7 @@ extends AbstractWikipediaShortestPathFinder {
 
             if (DISTANCEA.size() < DISTANCEB.size()) {
                 String current = QUEUEA.removeFirst();
-                
+
                 if (out != null) {
                     out.println("Forward:  " + current);
                 }
@@ -97,7 +97,7 @@ extends AbstractWikipediaShortestPathFinder {
                 }
 
                 numberOfExpandedNodes++;
-                
+
                 for (String child : getChildArticles(apiUrlText, current)) {
                     if (!PARENTSA.containsKey(child)) {
                         PARENTSA.put(child, current);
@@ -107,7 +107,7 @@ extends AbstractWikipediaShortestPathFinder {
                 }
             } else {
                 String current = QUEUEB.removeFirst();
-                
+
                 if (out != null) {
                     out.println("Backward: " + current);
                 }
@@ -121,7 +121,7 @@ extends AbstractWikipediaShortestPathFinder {
                 }
 
                 numberOfExpandedNodes++;
-                
+
                 for (String parent : getParentArticles(apiUrlText, current)) {
                     if (!PARENTSB.containsKey(parent)) {
                         PARENTSB.put(parent, current);

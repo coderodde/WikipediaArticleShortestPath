@@ -24,7 +24,7 @@ import org.apache.commons.io.IOUtils;
  * @version 1.6 (May 29, 2016)
  */
 public abstract class AbstractWikipediaShortestPathFinder {
-    
+
     private static final Map<Character, String> ENCODING_MAP = new HashMap<>();
 
     private static final String BACKWARD_REQUEST_URL = 
@@ -33,14 +33,14 @@ public abstract class AbstractWikipediaShortestPathFinder {
             "&bltitle=%s" + 
             "&bllimit=max" + 
             "&format=json";
-            
+
     private static final String FORWARD_REQUEST_URL = 
             "?action=query" +
             "&titles=%s" + 
             "&prop=links" + 
             "&pllimit=max" + 
             "&format=json"; 
-    
+
     static {
         ENCODING_MAP.put(' ', "_");
         ENCODING_MAP.put('"', "%22");
@@ -57,22 +57,22 @@ public abstract class AbstractWikipediaShortestPathFinder {
         ENCODING_MAP.put('}', "%7D");
         ENCODING_MAP.put('?', "%3F");
     }
-    
+
     /**
      * Caches the duration of the previous search in milliseconds.
      */
     protected long duration;
-    
+
     /**
      * Caches the number of expanded nodes in the previous search.
      */
     protected int numberOfExpandedNodes;
-    
+
     public abstract List<String> search(String sourceTitle, 
                                         String targetTitle,
                                         String apiUrlText,
                                         PrintStream out);
-        
+
     /**
      * Returns the duration of the search in milliseconds.
      * 
@@ -81,7 +81,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
     public long getDuration() {
         return duration;
     }
-    
+
     /**
      * Returns the number of expanded nodes.
      * 
@@ -90,7 +90,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
     public int getNumberOfExpandedNodes() {
         return numberOfExpandedNodes;
     }
-    
+
     /**
      * Constructs the shortest path.
      * 
@@ -121,7 +121,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
 
         return path;
     }
-    
+
     /**
      * Implements the neighbor function. 
      * 
@@ -135,7 +135,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
                                                  String currentTitle, 
                                                  boolean forward) {
         String jsonDataUrl;
-        
+
         try {
             jsonDataUrl = 
                     apiUrl + String.format(forward ? 
@@ -148,7 +148,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
         }
 
         String jsonText;
-        
+
         try {
             jsonText = IOUtils.toString(new URL(jsonDataUrl), 
                                         Charset.forName("UTF-8"));
@@ -186,8 +186,8 @@ public abstract class AbstractWikipediaShortestPathFinder {
                                                     String current) {
         return baseGetNeighbors(apiUrl, current, false);
     }
-    
-    
+
+
     /**
      * Returns all the Wikipedia article titles that the current article links 
      * to.
