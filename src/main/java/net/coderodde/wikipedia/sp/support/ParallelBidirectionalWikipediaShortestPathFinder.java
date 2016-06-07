@@ -63,22 +63,32 @@ extends AbstractWikipediaShortestPathFinder {
                                                            apiUrlText,
                                                            touchNodeHolder,
                                                            out);
+       
+        forwardThread.setCompanionThread(backwardThread);
+        backwardThread.setCompanionThread(forwardThread);
+        
         touchNodeHolder.setForwardThread(forwardThread);
         touchNodeHolder.setBackwardThread(backwardThread);
-
+        
         forwardThread.start();
         backwardThread.start();
-
+        
         try {
             forwardThread.join();
+        } catch (InterruptedException ex) {
+            throw new IllegalStateException("The forward thread threw " +
+                    ex.getClass().getSimpleName() + ": " +
+                    ex.getMessage(), ex);
+        }
+        
+        try {
             backwardThread.join();
         } catch (InterruptedException ex) {
-            throw new IllegalStateException(
-                    "The forward thread threw " + 
-                            ex.getClass().getSimpleName() + ": " + 
-                            ex.getMessage(), ex);
+            throw new IllegalStateException("The backward thread threw " +
+                    ex.getClass().getSimpleName() + ": " + 
+                    ex.getMessage(), ex);
         }
-
+        
         List<String> path = touchNodeHolder.constructPath();
         this.numberOfExpandedNodes = forwardThread.getNumberOfExpandedNodes() +
                                     backwardThread.getNumberOfExpandedNodes();
@@ -95,8 +105,9 @@ extends AbstractWikipediaShortestPathFinder {
         private final TouchNodeHolder touchNodeHolder;
         private final String apiUrlText;
         private final PrintStream out;
-        private volatile boolean exit;
         private int numberOfExpandedNodes;
+        private BackwardThread companionThread;
+        private volatile boolean exit;
 
         ForwardThread(String sourceTitle, 
                       String apiUrlText,
@@ -111,16 +122,20 @@ extends AbstractWikipediaShortestPathFinder {
             DISTANCE.put(sourceTitle, 0);
         }
 
+        void setCompanionThread(BackwardThread companionThread) {
+            this.companionThread = companionThread;
+        }
+        
+        void exitThread() {
+            this.exit = true;
+        }
+        
         Map<String, Integer> getDistanceMap() {
             return DISTANCE;
         }
 
         Map<String, String> getParentMap() {
             return PARENTS;
-        }
-
-        void exitThread() {
-            exit = true;
         }
 
         int getNumberOfExpandedNodes() {
@@ -156,6 +171,8 @@ extends AbstractWikipediaShortestPathFinder {
                     }
                 }
             }
+            
+            companionThread.exitThread();
         }
     }
 
@@ -167,8 +184,9 @@ extends AbstractWikipediaShortestPathFinder {
         private final TouchNodeHolder touchNodeHolder;
         private final String apiUrlText;
         private final PrintStream out;
-        private volatile boolean exit;
         private int numberOfExpandedNodes;
+        private volatile boolean exit;
+        private ForwardThread companionThread;
 
         BackwardThread(String targetTitle, 
                        String apiUrlText,
@@ -183,16 +201,20 @@ extends AbstractWikipediaShortestPathFinder {
             DISTANCE.put(targetTitle, 0);
         }
 
+        void setCompanionThread(ForwardThread companionThread) {
+            this.companionThread = companionThread;
+        }
+        
+        void exitThread() {
+            this.exit = true;
+        }
+        
         Map<String, Integer> getDistanceMap() {
             return DISTANCE;
         }
 
         Map<String, String> getParentMap() {
             return PARENTS;
-        }
-
-        void exitThread() {
-            exit = true;
         }
 
         int getNumberOfExpandedNodes() {
@@ -228,6 +250,8 @@ extends AbstractWikipediaShortestPathFinder {
                     }
                 }
             }
+            
+            companionThread.exitThread();
         }
     }
 
@@ -239,7 +263,8 @@ extends AbstractWikipediaShortestPathFinder {
         private final String target;
         private volatile String touchNode;
         private volatile int bestDistanceSoFar = Integer.MAX_VALUE;
-
+        private boolean pathIsFound;
+        
         TouchNodeHolder(String source, String target) {
             this.source = source;
             this.target = target;
@@ -272,6 +297,7 @@ extends AbstractWikipediaShortestPathFinder {
             if (distance > bestDistanceSoFar) {
                 forwardThread .exitThread();
                 backwardThread.exitThread();
+                pathIsFound = true;
                 return true;
             }
 
@@ -305,6 +331,12 @@ extends AbstractWikipediaShortestPathFinder {
         }
 
         synchronized List<String> constructPath() {
+            if (!pathIsFound) {
+                // The search was interrupted, or the target is not reachable 
+                // from the source node.
+                return new ArrayList<>();
+            }
+            
             Map<String, String> forwardParents;
             Map<String, String> backwardParents;
 
