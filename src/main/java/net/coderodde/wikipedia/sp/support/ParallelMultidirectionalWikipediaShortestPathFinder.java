@@ -40,6 +40,11 @@ extends AbstractWikipediaShortestPathFinder {
     private static final class SearchState {
         
         /**
+         * The number of threads spawned on behalf of this search direction.
+         */
+        private int threadsSpawnCount;
+        
+        /**
          * This FIFO queue contains the queue of nodes reached but not yet 
          * expanded. It is called <b>the search frontier</b>.
          */
@@ -101,6 +106,7 @@ extends AbstractWikipediaShortestPathFinder {
         void introduceThread(final StoppableThread thread) {
             // WARNING: set instead of list here.
             runningThreadSet.add(thread);
+            threadsSpawnCount++;
         }
         
         /**
@@ -112,12 +118,22 @@ extends AbstractWikipediaShortestPathFinder {
                 thread.requestThreadToExit();
             }
         }
+        
+        /**
+         * Returns the total number of threads ever spawned for this search 
+         * direction.
+         * 
+         * @return the total number of threads.
+         */
+        int getNumberOfSpawnedThreads() {
+            return threadsSpawnCount;
+        }
     }
     
     /**
      * This abstract class defines a thread that may be asked to terminate.
      */
-    private abstract static class StoppableThread {
+    private abstract static class StoppableThread extends Thread {
         
         /**
          * If set to {@code true}, this thread should exit.
@@ -132,7 +148,106 @@ extends AbstractWikipediaShortestPathFinder {
         }
     }
     
+    private abstract static class SearchThread extends StoppableThread {
+        
+        /**
+         * This field specifies whether the current thread is a master thread or
+         * a slave thread. For each search direction, there may be only one 
+         * master thread. Both slave and master threads perform the actual 
+         * search, yet only the master thread may create new slave threads.
+         */
+        protected final boolean master;
+        
+        /**
+         * The entire state of this search thread, shared possibly with other
+         * threads.
+         */
+        protected final SearchState searchState;
+        
+        /**
+         * Constructs a new search thread.
+         * 
+         * @param searchState the state object.
+         * @param master      the boolean flag indicating whether this new 
+         *                    thread is a master or not.
+         */
+        SearchThread(final SearchState searchState, final boolean master) {
+            this.master = master;
+            this.searchState = searchState;
+            searchState.introduceThread(this);
+        }
+        
+        /**
+         * Constructs a new slave search thread.
+         * 
+         * @param searchState the state object.
+         */
+        SearchThread(final SearchState searchState) {
+            this(searchState, false);
+        }
+    }
     
+    /**
+     * This class implements a search thread searching in forward direction.
+     */
+    private static final class ForwardSearchThread extends SearchThread {
+
+        /**
+         * Constructs a new forward search thread.
+         * 
+         * @param searchState the state object.
+         * @param master      the boolean flag indicating whether this search
+         *                    thread is a master or a slave thread.
+         */
+        ForwardSearchThread(SearchState searchState, boolean master) {
+            super(searchState, master);
+        }
+        
+        /**
+         * Constructs a new slave forward search thread.
+         * 
+         * @param searchState the state object.
+         */
+        ForwardSearchThread(SearchState searchState) {
+            this(searchState, false);
+        }
+        
+        @Override
+        public void run() {
+            
+        }
+    }
+    
+    /**
+     * This class implements a search thread searching in backward direction.
+     */
+    private static final class BackwardSearchThread extends SearchThread {
+
+        /**
+         * Constructs a new backward search thread.
+         * 
+         * @param searchState the state object.
+         * @param master      the boolean flag indicating whether this search
+         *                    thread is a master or a slave thread.
+         */
+        BackwardSearchThread(SearchState searchState, boolean master) {
+            super(searchState, master);
+        }
+        
+        /**
+         * Constructs a new slave backward search thread.
+         * 
+         * @param searchState the state object.
+         */
+        BackwardSearchThread(SearchState searchState) {
+            this(searchState, false);
+        }
+        
+        @Override
+        public void run() {
+            
+        }
+    }
     
     /**
      * This class holds the state shared by the two search directions.
