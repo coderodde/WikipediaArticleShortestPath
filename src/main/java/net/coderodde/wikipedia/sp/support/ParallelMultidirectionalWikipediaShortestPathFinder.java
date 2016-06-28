@@ -1,6 +1,8 @@
 package net.coderodde.wikipedia.sp.support;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -12,124 +14,217 @@ import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
 
 /**
  * This class implements a parallel multidirectional breadth-first search for 
- * crawling the shortest path in the Wikipedia article (di)graph.
+ * crawling the shortest path in the Wikipedia article digraph.
  * 
  * @author Rodion "rodde" Efremov
- * @version 1.6 (Jun 24, 2016)
+ * @version 1.6 (Jun 28, 2016)
  */
-public final class ParallelMultidirectionalWikipediaShortestPathFinder 
+public class ParallelMultidirectionalWikipediaShortestPathFinder 
 extends AbstractWikipediaShortestPathFinder {
 
     @Override
-    public List<String> search(String sourceTitle, String targetTitle, String apiUrlText, PrintStream out) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-    
-    private static class StoppableThread extends Thread {
-        
-        protected volatile boolean exit;
-        
-        void stopThread() {
-            exit = true;
+    public List<String> search(final String sourceTitle,
+                               final String targetTitle,
+                               final String apiUrlText, 
+                               final PrintStream out) {
+        if (sourceTitle.equals(targetTitle)) {
+            return new ArrayList<>(Arrays.asList(targetTitle));
         }
+        
+        return null;
     }
-    
+ 
+    /**
+     * This class holds all the state of a single search direction.
+     */
     private static final class SearchState {
         
-        private static final String PARENT_MAP_END_TOKEN = "";
-        
-        SearchState(final String start) {
-            queue.addLast(start);
-            // ConcurrentMap does not support null values:
-            parentMap.put(start, PARENT_MAP_END_TOKEN);
-            distanceMap.put(start, 0);
-        }
-        
         /**
-         * Holds the actual, concurrent queue of the generated nodes.
+         * This FIFO queue contains the queue of nodes reached but not yet 
+         * expanded. It is called <b>the search frontier</b>.
          */
-        private final Deque<String> queue = new LinkedBlockingDeque<>();
+        private final Deque<String> queue = new LinkedBlockingDeque();
         
         /**
-         * Holds the concurrent map mapping each node to the node it was 
-         * generated from.
+         * This map maps each discovered node to its parent on the shortest path
+         * so far.
          */
-        private final Map<String, String> parentMap = new ConcurrentHashMap<>();
+        private final Map<String, String> parents = new ConcurrentHashMap<>();
         
         /**
-         * Maps each node to its best so far distance.
+         * This map maps each discovered node to its best distance from the 
+         * start node so far.
          */
-        private final Map<String, Integer> distanceMap = 
-                new ConcurrentHashMap<>();
+        private final Map<String, Integer> distance = new ConcurrentHashMap<>();
         
         /**
-         * Caches all the threads that work on the same direction of the search.
-         * As soon as this set becomes empty, the threads in the opposite search
-         * direction may exit, since the target node is not reachable.
+         * The set of all the threads working on this particular direction. 
+         * Contains the only master thread and all the slave threads spawned by
+         * the master thread.
          */
         private final Set<StoppableThread> runningThreadSet = 
                 Collections.<StoppableThread>
                         newSetFromMap(new ConcurrentHashMap<>());
         
         /**
-         * The state of the opposite search direction.
+         * Returns the queue of the search frontier.
+         * 
+         * @return the queue of the search frontier.
          */
-        private SearchState oppositeSearchState;
-        
-        SearchState getOppositeSearchState() {
-            return oppositeSearchState;
-        }
-        
-        void setOppositeSearchState(final SearchState oppositeSearchState) {
-            this.oppositeSearchState = oppositeSearchState;
+        Deque<String> getQueue() {
+            return queue;
         }
         
         /**
-         * Adds the input thread to the set {@code runningThreadSet}.
+         * Returns the map mapping each node to its parent.
          * 
-         * @param thread the new thread.
+         * @return the parent map.
+         */
+        Map<String, String> getParentMap() {
+            return parents;
+        }
+        
+        /**
+         * Returns the map mapping each node to its best distance.
+         * 
+         * @return 
+         */
+        Map<String, Integer> getDistanceMap() {
+            return distance;
+        }
+        
+        /**
+         * Introduces a new thread to this search direction.
+         * 
+         * @param thread the thread to introduce.
          */
         void introduceThread(final StoppableThread thread) {
+            // WARNING: set instead of list here.
             runningThreadSet.add(thread);
         }
         
         /**
-         * Sends the message to all threads working on this state to exit as 
-         * soon as they hit the status check.
+         * Tells all the thread working on current direction to exit so that the
+         * threads may be joined.
          */
-        void requestExit() {
+        void requestThreadsToExit() {
             for (final StoppableThread thread : runningThreadSet) {
-                thread.stopThread();
+                thread.requestThreadToExit();
             }
         }
+    }
+    
+    /**
+     * This abstract class defines a thread that may be asked to terminate.
+     */
+    private abstract static class StoppableThread {
         
         /**
-         * Removes the thread out of the set of threads working.
-         * 
-         * @param thread 
+         * If set to {@code true}, this thread should exit.
          */
-        void markThreadAsDone(final Thread thread) {
-            runningThreadSet.remove(thread);
-            
-            if (runningThreadSet.isEmpty()) {
-                getOppositeSearchState().requestExit();
+        protected volatile boolean exit;
+        
+        /**
+         * Sends a request to finish the work.
+         */
+        void requestThreadToExit() {
+            exit = true;
+        }
+    }
+    
+    
+    
+    /**
+     * This class holds the state shared by the two search directions.
+     */
+    private static final class SharedSearchState {
+        
+        /**
+         * The state of all the forward search threads.
+         */
+        private SearchState searchStateForward;
+        
+        /**
+         * The state of all the backward search threads.
+         */
+        private SearchState searchStateBackward;
+        
+        /**
+         * Caches the best known length from the source to the target nodes.
+         */
+        private volatile int bestPathLengthSoFar = Integer.MAX_VALUE;
+        
+        /**
+         * The best search frontier touch node so far.
+         */
+        private volatile String touchNode;
+        
+        /**
+         * Caches whether the shortest path was found.
+         */
+        private boolean pathIsFound;
+        
+        void setForwardSearchState(final SearchState searchStateForward) {
+            this.searchStateForward = searchStateForward;
+        }
+        
+        void setBackwardSearchState(final SearchState searchStateBackward) {
+            this.searchStateBackward = searchStateBackward;
+        }
+        
+        synchronized void updateFromForwardDirection(final String current) {
+            if (searchStateBackward.getDistanceMap().containsKey(current)) {
+                final int currentDistance = 
+                        searchStateForward .getDistanceMap().get(current) +
+                        searchStateBackward.getDistanceMap().get(current);
+                
+                if (bestPathLengthSoFar > currentDistance) {
+                    bestPathLengthSoFar = currentDistance;
+                    touchNode = current;
+                }
             }
         }
-    }
-    
-    private static final class ForwardThread extends StoppableThread {
         
-        @Override
-        public void run() {
-            
+        synchronized void updateFromBackwardDirection(final String current) {
+            if (searchStateForward.getDistanceMap().containsKey(current)) {
+                final int currentDistance = 
+                        searchStateForward .getDistanceMap().get(current) +
+                        searchStateBackward.getDistanceMap().get(current);
+                
+                if (bestPathLengthSoFar > currentDistance) {
+                    bestPathLengthSoFar = currentDistance;
+                    touchNode = current;
+                }
+            }
         }
-    }
-    
-    private static final class BackwardThread extends StoppableThread {
         
-        @Override
-        public void run() {
+        synchronized boolean pathIsOptimal(final String node) {
+            if (touchNode == null) {
+                // Once here, the two search trees did not meet each other yet.
+                return false;
+            }
             
+            if (!searchStateForward.getDistanceMap().containsKey(node)) {
+                // The forward search did not reach the node 'node' yet.
+                return false;
+            }
+            
+            if (!searchStateBackward.getDistanceMap().containsKey(node)) {
+                // The backward search did not reach the node 'node' yet.
+                return false;
+            }
+            
+            final int distance = 
+                    searchStateForward .getDistanceMap().get(node) +
+                    searchStateBackward.getDistanceMap().get(node);
+            
+            if (distance > bestPathLengthSoFar) {
+                searchStateForward .requestThreadsToExit();
+                searchStateBackward.requestThreadsToExit();
+                return true;
+            }
+            
+            return false;
         }
     }
 }
