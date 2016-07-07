@@ -2,7 +2,6 @@ package net.coderodde.wikipedia.sp.support;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -22,14 +21,72 @@ import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
 public class ParallelMultidirectionalWikipediaShortestPathFinder 
 extends AbstractWikipediaShortestPathFinder {
 
+    /**
+     * Since {@link java.util.concurrent.ConcurrentHashMap} does not allow 
+     * {@code null} values, we need a token representing the {@code null}.
+     */
+    private static final String PARENT_MAP_END_TOKEN = "";
+    
     @Override
     public List<String> search(final String sourceTitle,
                                final String targetTitle,
                                final String apiUrlText, 
                                final PrintStream out) {
+        // TODO: Find out whether this if is necessary.
         if (sourceTitle.equals(targetTitle)) {
-            return new ArrayList<>(Arrays.asList(targetTitle));
+            final List<String> ret = new ArrayList<>(1);
+            
+            // The artical exists?
+            if (!getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
+                ret.add(sourceTitle);
+            }
+        
+            return ret;
         }
+        
+        final SharedSearchState sharedSearchState = new SharedSearchState();
+        final SearchState forwardSearchState  = new SearchState(sourceTitle);
+        final SearchState backwardSearchState = new SearchState(targetTitle);
+        
+        sharedSearchState.setForwardSearchState(forwardSearchState);
+        sharedSearchState.setBackwardSearchState(backwardSearchState);
+        
+        final ForwardSearchThread forwardSearchThread =
+                new ForwardSearchThread(forwardSearchState,
+                                        sharedSearchState,
+                                        true,
+                                        out,
+                                        0,
+                                        apiUrlText);
+        
+        final BackwardSearchThread backwardSearchThread =
+                new BackwardSearchThread(backwardSearchState,
+                                         sharedSearchState,
+                                         true,
+                                         out,
+                                         0,
+                                         apiUrlText);
+        
+        forwardSearchThread.start();
+        backwardSearchThread.start();
+        
+        try {
+            forwardSearchThread.join();
+        } catch (final InterruptedException ex) {
+            throw new IllegalStateException("The forward thread threw " +
+                    ex.getClass().getSimpleName() + ": " +
+                    ex.getMessage(), ex);
+        }
+        
+        try {
+            backwardSearchThread.join();
+        } catch (final InterruptedException ex) {
+            throw new IllegalStateException("The backward thread threw " +
+                    ex.getClass().getSimpleName() + ": " +
+                    ex.getMessage(), ex);
+        }
+        
+        final List<String> path = null;
         
         return null;
     }
@@ -46,7 +103,7 @@ extends AbstractWikipediaShortestPathFinder {
         
         /**
          * This FIFO queue contains the queue of nodes reached but not yet 
-         * expanded. It is called <b>the search frontier</b>.
+         * expanded. It is called the <b>search frontier</b>.
          */
         private final Deque<String> queue = new LinkedBlockingDeque();
         
@@ -71,6 +128,12 @@ extends AbstractWikipediaShortestPathFinder {
                 Collections.<StoppableThread>
                         newSetFromMap(new ConcurrentHashMap<>());
         
+        public SearchState(final String initialNode) {
+            queue.add(initialNode);
+            parents.put(initialNode, PARENT_MAP_END_TOKEN);
+            distance.put(initialNode, 0);
+        }
+        
         /**
          * Returns the queue of the search frontier.
          * 
@@ -92,7 +155,7 @@ extends AbstractWikipediaShortestPathFinder {
         /**
          * Returns the map mapping each node to its best distance.
          * 
-         * @return 
+         * @return the distance map.
          */
         Map<String, Integer> getDistanceMap() {
             return distance;
@@ -165,25 +228,68 @@ extends AbstractWikipediaShortestPathFinder {
         protected final SearchState searchState;
         
         /**
+         * The state shared by both the directions.
+         */
+        protected final SharedSearchState sharedSearchState;
+        
+        /**
+         * The output stream for possibly logging the search progress. The value
+         * of {@code null} is allowed.
+         */
+        protected final PrintStream out;
+        
+        /**
+         * Caches the amount of nodes expanded by this thread.
+         */
+        protected int numberOfExpandedNodes;
+        
+        /**
+         * The ID of this thread.
+         */
+        protected final int id;
+        
+        /**
+         * The URL to the Wikipedia API.
+         */
+        protected final String apiUrlText;
+        
+        /**
          * Constructs a new search thread.
          * 
          * @param searchState the state object.
          * @param master      the boolean flag indicating whether this new 
          *                    thread is a master or not.
          */
-        SearchThread(final SearchState searchState, final boolean master) {
-            this.master = master;
-            this.searchState = searchState;
-            searchState.introduceThread(this);
+        SearchThread(final SearchState searchState, 
+                     final SharedSearchState sharedSearchState,
+                     final boolean master,
+                     final PrintStream out,
+                     final int id,
+                     final String apiUrlText) {
+            this.searchState       = searchState;
+            this.sharedSearchState = sharedSearchState;
+            this.master            = master;
+            this.out               = out;
+            this.id                = id;
+            this.apiUrlText        = apiUrlText;
+        }
+            
+        @Override
+        public boolean equals(final Object other) {
+            if (other == null) {
+                return false;
+            }
+            
+            if (!getClass().equals(other.getClass())) {
+                return false;
+            }
+            
+            return id == ((SearchThread) other).id;
         }
         
-        /**
-         * Constructs a new slave search thread.
-         * 
-         * @param searchState the state object.
-         */
-        SearchThread(final SearchState searchState) {
-            this(searchState, false);
+        @Override
+        public int hashCode() {
+            return id;
         }
     }
     
@@ -199,22 +305,56 @@ extends AbstractWikipediaShortestPathFinder {
          * @param master      the boolean flag indicating whether this search
          *                    thread is a master or a slave thread.
          */
-        ForwardSearchThread(SearchState searchState, boolean master) {
-            super(searchState, master);
-        }
-        
-        /**
-         * Constructs a new slave forward search thread.
-         * 
-         * @param searchState the state object.
-         */
-        ForwardSearchThread(SearchState searchState) {
-            this(searchState, false);
+        ForwardSearchThread(final SearchState searchState, 
+                            final SharedSearchState sharedSearchState,
+                            final boolean master, 
+                            final PrintStream out,
+                            final int id,
+                            final String apiUrlText) {
+            super(searchState, 
+                  sharedSearchState,
+                  master, 
+                  out,
+                  id,
+                  apiUrlText);
         }
         
         @Override
         public void run() {
+            final Deque<String> QUEUE           = searchState.getQueue();
+            final Map<String, String> PARENTS   = searchState.getParentMap();
+            final Map<String, Integer> DISTANCE = searchState.getDistanceMap();
             
+            while (!QUEUE.isEmpty()) {
+                if (exit) {
+                    return;
+                }
+                
+                final String current = QUEUE.removeFirst();
+                
+                if (out != null) {
+                    out.println("[Forward search thread " + 
+                                getId() + 
+                                " expanding: " + current + "]");
+                }
+             
+                sharedSearchState.updateFromForwardDirection(current);
+                
+                if (sharedSearchState.pathIsOptimal(current)) {
+                    return;
+                }
+                
+                numberOfExpandedNodes++;
+                
+                for (final String child : 
+                        getChildArticles(apiUrlText, current)) {
+                    if (!PARENTS.containsKey(child)) {
+                        PARENTS.put(child, current);
+                        DISTANCE.put(child, DISTANCE.get(current) + 1);
+                        QUEUE.addLast(child);
+                    }
+                }
+            }
         }
     }
     
@@ -230,22 +370,55 @@ extends AbstractWikipediaShortestPathFinder {
          * @param master      the boolean flag indicating whether this search
          *                    thread is a master or a slave thread.
          */
-        BackwardSearchThread(SearchState searchState, boolean master) {
-            super(searchState, master);
-        }
-        
-        /**
-         * Constructs a new slave backward search thread.
-         * 
-         * @param searchState the state object.
-         */
-        BackwardSearchThread(SearchState searchState) {
-            this(searchState, false);
+        BackwardSearchThread(final SearchState searchState, 
+                             final SharedSearchState sharedSearchState,
+                             final boolean master,
+                             final PrintStream out,
+                             final int id,
+                             final String apiUrlText) {
+            super(searchState, 
+                  sharedSearchState,
+                  master,
+                  out,
+                  id,
+                  apiUrlText);
         }
         
         @Override
         public void run() {
+            final Deque<String> QUEUE           = searchState.getQueue();
+            final Map<String, String> PARENTS   = searchState.getParentMap();
+            final Map<String, Integer> DISTANCE = searchState.getDistanceMap();
             
+            while (!QUEUE.isEmpty()) {
+                if (exit) {
+                    return;
+                }
+                
+                String current = QUEUE.removeFirst();
+                
+                if (out != null) {
+                    out.println("[Backward search thread " + 
+                                getId() + 
+                                " expanding: " + current + "]");
+                }
+                
+                sharedSearchState.updateFromBackwardDirection(current);
+                
+                if (sharedSearchState.pathIsOptimal(current)) {
+                    return;
+                }
+                
+                numberOfExpandedNodes++;
+                
+                for (final String parent : getParentArticles(apiUrlText, current)) {
+                    if (!PARENTS.containsKey(parent)) {
+                        PARENTS.put(parent, current);
+                        DISTANCE.put(parent, DISTANCE.get(current) + 1);
+                        QUEUE.addLast(parent);
+                    }
+                }
+            }
         }
     }
     
