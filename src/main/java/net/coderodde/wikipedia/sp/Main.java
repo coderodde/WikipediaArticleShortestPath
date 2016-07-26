@@ -1,10 +1,11 @@
 package net.coderodde.wikipedia.sp;
 
 import java.util.List;
-import java.io.IOException;
 import java.io.PrintStream;
+import static net.coderodde.wikipedia.sp.Miscellanea.nth;
 import net.coderodde.wikipedia.sp.support.BidirectionalWikipediaShortestPathFinder;
 import net.coderodde.wikipedia.sp.support.ParallelBidirectionalWikipediaShortestPathFinder;
+import net.coderodde.wikipedia.sp.support.ParallelMultidirectionalWikipediaShortestPathFinder;
 
 /**
  * This class implements an unweighted shortest path finder in the Wikipedia 
@@ -14,240 +15,78 @@ import net.coderodde.wikipedia.sp.support.ParallelBidirectionalWikipediaShortest
  */
 public class Main {
 
-    private static final class Arguments {
+    public static void main(String[] args) {
+        CommandLineArgumentParser parser =
+                new CommandLineArgumentParser();
         
-        static final int DEFAULT_THREAD_COUNT = 1;
+        CommandLineArguments arguments = null;
         
-        private final boolean log;
-        private final int threadCount;
-        private final String sourceTitle;
-        private final String targetTitle;
-        
-        Arguments(final boolean log, 
-                  final int threadCount,
-                  final String sourceTitle,
-                  final String targetTitle) {
-            this.log = log;
-            this.threadCount = threadCount;
-            this.sourceTitle = sourceTitle;
-            this.targetTitle = targetTitle;
-        }
-        
-        boolean doLog() {
-            return log;
-        }
-        
-        int getThreadCount() {
-            return threadCount;
-        }
-        
-        String getSourceTitle() {
-            return sourceTitle;
-        }
-        
-        String getTargetTitle() {
-            return targetTitle;
-        }
-    }
-    
-    private static Arguments parse2Arguments(final String[] args) {
-        return new Arguments(false, 1, args[0], args[1]);
-    }
-    
-    private static Arguments parse3Arguments(final String[] args) {
-        boolean log = false;
-        
-        switch (args[0]) {
-            case "--thread":
-                
-                throw new InvalidCommandLineOptions(
-                        "The switch \"--tread\" must have an integer argument: " +
-                        "\"--threads N\"");
-                
-            case "--output":
-                
-                log = true;
-                break;
-                
-            default:
-                
-                throw new InvalidCommandLineOptions(
-                        "Unknown switch \"" + args[0] + "\".");
-        }
-        
-        return new Arguments(log, 1, args[1], args[2]);
-    }
-    
-    private static Arguments parse4Arguments(final String[] args) {
-        switch (args[0]) {
-            
-            case "--output":
-                
-                throw new InvalidCommandLineOptions(
-                        "Bad command-line format: second argument invalid.");
-                
-            case "--threads":
-                
-                return new Arguments(false, 
-                                     parseInt(args[1]), 
-                                     args[2], 
-                                     args[3]);
-                
-            default:
-                
-                throw new InvalidCommandLineOptions(
-                        "Unknown switch \"" + args[0] + "\".");
-        }
-    }
-    
-    private static Arguments parse5Arguments(final String[] args) {
-        
-    }
-    
-    private static Arguments parseCommandLine(final String[] args) {
-        switch (args.length) {
-            case 0:
-            case 1:
-                
-                throw new InvalidCommandLineOptions(
-                        "At least two command-line arguments are required (" +
-                        "the source article and the target article).");
-                
-            case 2:
-                
-                return parse2Arguments(args);
-                
-            case 3:
-                
-                return parse3Arguments(args);
-                
-            case 4:
-                
-                return parse4Arguments(args);
-                
-            case 5:
-                
-                return parse5Arguments(args);
-                
-            default:
-                
-                throw new InvalidCommandLineOptions("Bad command-line format.");
-        }
-    }
-    
-    private static int parseInt(final String numberString) {
         try {
-            return Integer.parseInt(numberString);
-        } catch (final NumberFormatException ex) {
-            throw new InvalidCommandLineOptions(
-                    "Could not parse \"" + numberString + "\" as an integer.");
-        }
-    }
-    
-    public static void main(String[] args) throws IOException {
-        if (args.length < 2) {
+            arguments = parser.parse(args);
+        } catch (final InvalidCommandLineOptionsException ex) {
+            System.err.println("ERROR: " + ex.getMessage());
             printUsageMessage();
-            return;
-        }
-
-        String fromUrl;
-        String toUrl;
-        boolean noOutput = false;
-        int threadCount = 1;
-
-        switch (args.length) {
-            case 2:
+            System.exit(1);
         }
         
-        switch (args.length) {
-            case 2:
-                fromUrl = args[0];
-                toUrl   = args[1];
-                break;
+        System.out.println("[CONFIGURATION] Logging progress: " + 
+                arguments.doLog());
+        
+        System.out.println("[CONFIGURATION] Thread count:     " + 
+                arguments.getThreadCount());
+        
+        System.out.println("[CONDIGURATION] Source URL:       " + 
+                arguments.getSourceUrl());
+        
+        System.out.println("[CONFIGURATION] Target URL:       " +
+                arguments.getTargetUrl());
+        
+        System.out.println("[CONFIGURATION] Dequeue trials:   " + 
+                arguments.getDequeueTrials());
+        
+        System.out.println("[CONFIGURATION] Trial wait time:  " +
+                arguments.getTrialWaitTime());
 
-            case 3:
-                switch (args[0]) {
-                    case "--no-output":
-                        noOutput = true;
-                        break;
-
-                    case "--threads":
-                        
-                        break;
-
-                    default:
-                        printUsageMessage();
-                        return;
-                }
-
-                fromUrl = args[1];
-                toUrl   = args[2];
-                break;
-
-            case 4:
-                switch (args[0]) {
-                    case "--no-output":
-                        noOutput = true;
-                        break;
-
-                    case "--serial":
-                        serial = true;
-                        break;
-
-                    default:
-                        printUsageMessage();
-                        return;
-                }
-
-                switch (args[1]) {
-                    case "--no-output":
-                        noOutput = true;
-                        break;
-
-                    case "--serial":
-                        serial = true;
-                        break;
-
-                    default:
-                        printUsageMessage();
-                        return;
-                }
-
-                fromUrl = args[2];
-                toUrl   = args[3];
-                break;
-
-            default:
-                printUsageMessage();
-                return;
-        }
-
-        WikipediaURLHandler fromUrlHandler;
-        WikipediaURLHandler toUrlHandler;
+        WikipediaURLHandler fromUrlHandler = null;
+        WikipediaURLHandler toUrlHandler   = null;
 
         try {
-            fromUrlHandler = new WikipediaURLHandler(fromUrl);
-            toUrlHandler   = new WikipediaURLHandler(toUrl);
+            fromUrlHandler = new WikipediaURLHandler(arguments.getSourceUrl());
+            toUrlHandler   = new WikipediaURLHandler(arguments.getTargetUrl());
         } catch (IllegalArgumentException ex) {
-            System.err.println(ex.getMessage());
-            return;
+            System.err.println("ERROR: " + ex.getMessage());
+            printUsageMessage();
+            System.exit(1);
         }            
 
         if (!fromUrlHandler.getBasicURL().equals(toUrlHandler.getBasicURL())) {
-            System.out.println("[ERROR] The source and target articles seem " +
+            System.out.println("ERROR: The source and target articles seem " +
                                "to be written in different languages.");
-            return;
+            System.exit(1);
         }
 
-        System.out.println("[STATUS] Searching from \"" + fromUrl + "\" to \"" +
-                           toUrl + "\" using " +
-                           (serial ? "serial " : "parallel ") + "algorithm.");
+        System.out.println(
+                "[STATUS] Searching from \"" + arguments.getSourceUrl() + 
+                "\" to \"" + arguments.getTargetUrl() + "\" using " +
+                arguments.getThreadCount() + " thread" + nth(arguments.getThreadCount()) + ".");
 
-        PrintStream out = noOutput ? null : System.out;
-        AbstractWikipediaShortestPathFinder finder = serial ? 
-                new BidirectionalWikipediaShortestPathFinder() :
-                new ParallelBidirectionalWikipediaShortestPathFinder();
-
+        PrintStream out = arguments.doLog() ? System.out : null;
+        AbstractWikipediaShortestPathFinder finder; 
+        
+        final int numberOfThreads = arguments.getThreadCount();
+        
+        if (numberOfThreads < 2) {
+            finder = new BidirectionalWikipediaShortestPathFinder();
+        } else if (numberOfThreads == 2) {
+            finder = new ParallelBidirectionalWikipediaShortestPathFinder();
+        } else {
+            finder = new 
+            ParallelMultidirectionalWikipediaShortestPathFinder(
+                    arguments.getThreadCount() / 2,
+                    arguments.getDequeueTrials(),
+                    arguments.getTrialWaitTime());
+        }
+        
         String sourceTitle = fromUrlHandler.getTitle();
         String targetTitle = toUrlHandler.getTitle();
 
@@ -263,14 +102,43 @@ public class Main {
 
         path.forEach(System.out::println);
     }
-
+    
     private static void printUsageMessage() {
         System.out.println(
-                "Usage: java -jar FILE.jar [--no_output] " + 
-                        "[--threads N] SOURCE TARGET");
-        System.out.println("Where: --no-output Do not print the progress.");
-        System.out.println("       --threads N Use N threads for searching.");
-        System.out.println("       SOURCE      The source article URL.");
-        System.out.println("       TARGET      The target article URL.");
+                "Usage: java -jar FILE.jar [" +
+                        CommandLineArgumentParser.LOG_SWITCH_SHORT + " | " +
+                        CommandLineArgumentParser.LOG_SWITCH_LONG + "] " +
+                        "[" + CommandLineArgumentParser.THREAD_SWITCH_SHORT + 
+                        " | " + CommandLineArgumentParser.THREAD_SWITCH_LONG + 
+                        "] [" + CommandLineArgumentParser.TRIAL_SWITCH_LONG + 
+                        "] [" + 
+                        CommandLineArgumentParser.WAIT_TIME_SWITCH_SHORT + 
+                        " | " + 
+                        CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG +
+                        "] SOURCE_URL TARGET_URL");
+        
+        System.out.println(
+                "Where:");
+        System.out.println("    " +
+                CommandLineArgumentParser.LOG_SWITCH_SHORT + ", " + 
+                CommandLineArgumentParser.LOG_SWITCH_LONG +
+                "  Request progress logging.");
+        
+        System.out.println("    " +
+                CommandLineArgumentParser.THREAD_SWITCH_SHORT + " N, " + 
+                CommandLineArgumentParser.THREAD_SWITCH_LONG + " N  " +
+                "Request N threads for the search.");
+        
+        System.out.println("    " +
+                CommandLineArgumentParser.TRIAL_SWITCH_LONG + " N  " +
+                "Request N trials for popping the queue.");
+        
+        System.out.println("    " +
+                CommandLineArgumentParser.WAIT_TIME_SWITCH_SHORT + " N, " +
+                CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG + "N" +
+                "  Request the trial wait time of N milliseconds.");
+        
+        System.out.println("    SOURCE_URL the URL of the source article.");
+        System.out.println("    TARGET_URL the URL of the target article.");
     }
 }

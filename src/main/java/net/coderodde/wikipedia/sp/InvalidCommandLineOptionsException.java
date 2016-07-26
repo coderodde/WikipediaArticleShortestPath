@@ -6,9 +6,9 @@ package net.coderodde.wikipedia.sp;
  * @author Rodion "rodde" Efremov
  * @version 1.6
  */
-public class InvalidCommandLineOptions extends RuntimeException {
+public class InvalidCommandLineOptionsException extends RuntimeException {
     
-    public InvalidCommandLineOptions(final String message) {
+    public InvalidCommandLineOptionsException(final String message) {
         super(message);
     }
 }
