@@ -109,20 +109,20 @@ public class Main {
                         CommandLineArgumentParser.LOG_SWITCH_SHORT + " | " +
                         CommandLineArgumentParser.LOG_SWITCH_LONG + "] " +
                         "[" + CommandLineArgumentParser.THREAD_SWITCH_SHORT + 
-                        " | " + CommandLineArgumentParser.THREAD_SWITCH_LONG + 
-                        "] [" + CommandLineArgumentParser.TRIAL_SWITCH_LONG + 
-                        "] [" + 
+                        " N | " + CommandLineArgumentParser.THREAD_SWITCH_LONG + 
+                        " N] [" + CommandLineArgumentParser.TRIAL_SWITCH_LONG + 
+                        " N] [" + 
                         CommandLineArgumentParser.WAIT_TIME_SWITCH_SHORT + 
-                        " | " + 
+                        " N | " + 
                         CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG +
-                        "] SOURCE_URL TARGET_URL");
+                        " N] SOURCE_URL TARGET_URL");
         
         System.out.println(
                 "Where:");
         System.out.println("    " +
                 CommandLineArgumentParser.LOG_SWITCH_SHORT + ", " + 
                 CommandLineArgumentParser.LOG_SWITCH_LONG +
-                "  Request progress logging.");
+                "          Request progress logging.");
         
         System.out.println("    " +
                 CommandLineArgumentParser.THREAD_SWITCH_SHORT + " N, " + 
@@ -131,14 +131,14 @@ public class Main {
         
         System.out.println("    " +
                 CommandLineArgumentParser.TRIAL_SWITCH_LONG + " N  " +
-                "Request N trials for popping the queue.");
+                "       Request N trials for popping the queue.");
         
         System.out.println("    " +
                 CommandLineArgumentParser.WAIT_TIME_SWITCH_SHORT + " N, " +
-                CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG + "N" +
-                "  Request the trial wait time of N milliseconds.");
+                CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG + " N" +
+                "     Request the trial wait time of N milliseconds.");
         
-        System.out.println("    SOURCE_URL the URL of the source article.");
-        System.out.println("    TARGET_URL the URL of the target article.");
+        System.out.println("    SOURCE_URL         the URL of the source article.");
+        System.out.println("    TARGET_URL         the URL of the target article.");
     }
 }
