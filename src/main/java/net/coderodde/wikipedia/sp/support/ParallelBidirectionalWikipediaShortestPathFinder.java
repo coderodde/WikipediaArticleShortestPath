@@ -48,7 +48,13 @@ extends AbstractWikipediaShortestPathFinder {
         this.duration = 0L;
 
         if (source.equals(target)) {
-            return new ArrayList<>(Arrays.asList(source));
+            final List<String> ret = new ArrayList<>(1);
+            
+            if (!getChildArticles(apiUrlText, source).isEmpty()) {
+                ret.add(source);
+            }
+            
+            return ret;
         }
 
         this.duration = System.currentTimeMillis();

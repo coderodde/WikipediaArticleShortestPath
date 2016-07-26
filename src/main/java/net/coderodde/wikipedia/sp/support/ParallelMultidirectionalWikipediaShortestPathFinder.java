@@ -77,6 +77,8 @@ extends AbstractWikipediaShortestPathFinder {
             return ret;
         }
         
+        this.duration = System.currentTimeMillis();
+        
         final SharedSearchState sharedSearchState = new SharedSearchState();
         final SearchState forwardSearchState  = new SearchState(sourceTitle);
         final SearchState backwardSearchState = new SearchState(targetTitle);
@@ -136,6 +138,17 @@ extends AbstractWikipediaShortestPathFinder {
             throw new IllegalStateException("The backward thread threw " +
                     ex.getClass().getSimpleName() + ": " +
                     ex.getMessage(), ex);
+        }
+        
+        this.duration = System.currentTimeMillis() - this.duration;
+        this.numberOfExpandedNodes = 0;
+        
+        for (final ForwardSearchThread thread : forwardSearchThreads) {
+            this.numberOfExpandedNodes += thread.getNumberOfExpandedNodes();
+        }
+        
+        for (final BackwardSearchThread thread : backwardSearchThreads) {
+            this.numberOfExpandedNodes += thread.getNumberOfExpandedNodes();
         }
         
         return sharedSearchState.getPath();
@@ -328,6 +341,10 @@ extends AbstractWikipediaShortestPathFinder {
         @Override
         public int hashCode() {
             return id;
+        }
+        
+        int getNumberOfExpandedNodes() {
+            return numberOfExpandedNodes;
         }
     }
     
@@ -524,13 +541,6 @@ extends AbstractWikipediaShortestPathFinder {
             if (searchStateBackward.getDistanceMap().containsKey(current)
                     && searchStateForward.getDistanceMap()
                                          .containsKey(current)) {
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
                 final int currentDistance = 
                         searchStateForward .getDistanceMap().get(current) +
                         searchStateBackward.getDistanceMap().get(current);
@@ -549,13 +559,6 @@ extends AbstractWikipediaShortestPathFinder {
                 final int currentDistance = 
                         searchStateForward .getDistanceMap().get(current) +
                         searchStateBackward.getDistanceMap().get(current);
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println();
                 
                 if (bestPathLengthSoFar > currentDistance) {
                     bestPathLengthSoFar = currentDistance;
@@ -595,7 +598,6 @@ extends AbstractWikipediaShortestPathFinder {
         }
         
         synchronized void requestExit() {
-            System.out.println("YEEEAAAAHHHHHHHHHHHHH     !!!!!");
             searchStateForward .requestThreadsToExit();
             searchStateBackward.requestThreadsToExit();
         }
