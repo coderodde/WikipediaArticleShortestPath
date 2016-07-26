@@ -136,7 +136,7 @@ public class Main {
         System.out.println("    " +
                 CommandLineArgumentParser.WAIT_TIME_SWITCH_SHORT + " N, " +
                 CommandLineArgumentParser.WAIT_TIME_SWITCH_LONG + " N" +
-                "     Request the trial wait time of N milliseconds.");
+                "      Request the trial wait time of N milliseconds.");
         
         System.out.println("    SOURCE_URL         the URL of the source article.");
         System.out.println("    TARGET_URL         the URL of the target article.");

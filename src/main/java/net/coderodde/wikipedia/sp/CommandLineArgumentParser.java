@@ -59,7 +59,7 @@ class CommandLineArgumentParser {
     /**
      * The default number of trials to pop the queue.
      */
-    private static final int DEFAULT_TRIALS = 10;
+    private static final int DEFAULT_TRIALS = 50;
     
     /**
      * The default number of milliseconds to wait for the next trial.

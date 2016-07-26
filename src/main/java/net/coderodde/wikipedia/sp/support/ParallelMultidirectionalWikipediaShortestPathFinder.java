@@ -69,7 +69,7 @@ extends AbstractWikipediaShortestPathFinder {
         if (sourceTitle.equals(targetTitle)) {
             final List<String> ret = new ArrayList<>(1);
             
-            // The artical exists?
+            // The article exists?
             if (!getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
                 ret.add(sourceTitle);
             }
@@ -138,7 +138,7 @@ extends AbstractWikipediaShortestPathFinder {
                     ex.getMessage(), ex);
         }
         
-        return null;
+        return sharedSearchState.getPath();
     }
  
     /**
@@ -365,21 +365,17 @@ extends AbstractWikipediaShortestPathFinder {
             final Map<String, String> PARENTS   = searchState.getParentMap();
             final Map<String, Integer> DISTANCE = searchState.getDistanceMap();
             
-            while (!QUEUE.isEmpty()) {
+            while (true) {
                 if (exit) {
                     return;
                 }
                 
-                if (QUEUE.isEmpty()) {
-                    int trials = 0;
-                    
-                    while (trials < dequeuTrials && QUEUE.isEmpty()) {
-                        mysleep(trialWaitTime);
-                    }
-                    
-                    if (QUEUE.isEmpty()) {
+                while (QUEUE.isEmpty()) {
+                    if (exit) {
                         return;
                     }
+                    
+                    mysleep(trialWaitTime);
                 }
                 
                 final String current = QUEUE.removeFirst();
@@ -393,6 +389,7 @@ extends AbstractWikipediaShortestPathFinder {
                 sharedSearchState.updateFromForwardDirection(current);
                 
                 if (sharedSearchState.pathIsOptimal(current)) {
+                    sharedSearchState.requestExit();
                     return;
                 }
                 
@@ -449,16 +446,12 @@ extends AbstractWikipediaShortestPathFinder {
                     return;
                 }
                 
-                if (QUEUE.isEmpty()) {
-                    int trials = 0;
-                    
-                    while (trials < dequeuTrials && QUEUE.isEmpty()) {
-                        mysleep(trialWaitTime);
-                    }
-                    
-                    if (QUEUE.isEmpty()) {
+                while (QUEUE.isEmpty()) {
+                    if (exit) {
                         return;
                     }
+                    
+                    mysleep(trialWaitTime);
                 }
                 
                 String current = QUEUE.removeFirst();
@@ -472,6 +465,7 @@ extends AbstractWikipediaShortestPathFinder {
                 sharedSearchState.updateFromBackwardDirection(current);
                 
                 if (sharedSearchState.pathIsOptimal(current)) {
+                    sharedSearchState.requestExit();
                     return;
                 }
                 
@@ -580,6 +574,11 @@ extends AbstractWikipediaShortestPathFinder {
             }
             
             return false;
+        }
+        
+        synchronized void requestExit() {
+            searchStateForward .requestThreadsToExit();
+            searchStateBackward.requestThreadsToExit();
         }
         
         synchronized List<String> getPath() {
