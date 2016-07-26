@@ -1,6 +1,7 @@
 package net.coderodde.wikipedia.sp.support;
 
 import java.io.PrintStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -8,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingDeque;
 import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
 
 /**
@@ -163,7 +163,8 @@ extends AbstractWikipediaShortestPathFinder {
          * This FIFO queue contains the queue of nodes reached but not yet 
          * expanded. It is called the <b>search frontier</b>.
          */
-        private final Deque<String> queue = new LinkedBlockingDeque();
+        private final ConcurrentQueueWrapper queue = 
+                new ConcurrentQueueWrapper(new ArrayDeque<>());
         
         /**
          * This map maps each discovered node to its predecessor on the shortest 
@@ -187,7 +188,7 @@ extends AbstractWikipediaShortestPathFinder {
                         newSetFromMap(new ConcurrentHashMap<>());
         
         public SearchState(final String initialNode) {
-            queue.add(initialNode);
+            queue.enqueue(initialNode);
             parents.put(initialNode, PARENT_MAP_END_TOKEN);
             distance.put(initialNode, 0);
         }
@@ -197,7 +198,7 @@ extends AbstractWikipediaShortestPathFinder {
          * 
          * @return the queue of the search frontier.
          */
-        Deque<String> getQueue() {
+        ConcurrentQueueWrapper getQueue() {
             return queue;
         }
         
@@ -378,7 +379,7 @@ extends AbstractWikipediaShortestPathFinder {
         
         @Override
         public void run() {
-            final Deque<String> QUEUE           = searchState.getQueue();
+            final ConcurrentQueueWrapper QUEUE            = searchState.getQueue();
             final Map<String, String> PARENTS   = searchState.getParentMap();
             final Map<String, Integer> DISTANCE = searchState.getDistanceMap();
             
@@ -395,7 +396,11 @@ extends AbstractWikipediaShortestPathFinder {
                     mysleep(trialWaitTime);
                 }
                 
-                final String current = QUEUE.removeFirst();
+                final String current = QUEUE.dequeue();
+                
+                if (current == null) {
+                    continue;
+                }
                 
                 if (out != null) {
                     out.println("[Forward search thread " + 
@@ -417,7 +422,7 @@ extends AbstractWikipediaShortestPathFinder {
                     if (!PARENTS.containsKey(child)) {
                         PARENTS.put(child, current);
                         DISTANCE.put(child, DISTANCE.get(current) + 1);
-                        QUEUE.addLast(child);
+                        QUEUE.enqueue(child);
                     }
                 }
             }
@@ -454,7 +459,7 @@ extends AbstractWikipediaShortestPathFinder {
         
         @Override
         public void run() {
-            final Deque<String> QUEUE           = searchState.getQueue();
+            final ConcurrentQueueWrapper QUEUE  = searchState.getQueue();
             final Map<String, String> PARENTS   = searchState.getParentMap();
             final Map<String, Integer> DISTANCE = searchState.getDistanceMap();
             
@@ -471,7 +476,7 @@ extends AbstractWikipediaShortestPathFinder {
                     mysleep(trialWaitTime);
                 }
                 
-                String current = QUEUE.removeFirst();
+                String current = QUEUE.dequeue();
                 
                 if (out != null) {
                     out.println("[Backward search thread " + 
@@ -492,7 +497,7 @@ extends AbstractWikipediaShortestPathFinder {
                     if (!PARENTS.containsKey(parent)) {
                         PARENTS.put(parent, current);
                         DISTANCE.put(parent, DISTANCE.get(current) + 1);
-                        QUEUE.addLast(parent);
+                        QUEUE.enqueue(parent);
                     }
                 }
             }
@@ -631,6 +636,31 @@ extends AbstractWikipediaShortestPathFinder {
             }
             
             return path;
+        }
+    }
+    
+    private static final class ConcurrentQueueWrapper {
+        
+        private final Deque<String> queue;
+        
+        ConcurrentQueueWrapper(final Deque<String> queue) {
+            this.queue = queue;
+        }
+        
+        synchronized String dequeue() {
+            if (queue.isEmpty()) {
+                return null;
+            }
+            
+            return queue.removeFirst();
+        }
+        
+        synchronized void enqueue(final String node) {
+            queue.addLast(node);
+        }
+        
+        synchronized boolean isEmpty() {
+            return queue.isEmpty();
         }
     }
     
