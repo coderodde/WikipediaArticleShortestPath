@@ -279,8 +279,14 @@ extends AbstractWikipediaShortestPathFinder {
          */
         protected final String apiUrlText;
         
+        /**
+         * The number of trials to dequeue the queue.
+         */
         protected final int dequeuTrials;
         
+        /**
+         * The number of milliseconds to wait if a dequeuing trial fails.
+         */
         protected final int trialWaitTime;
         
         /**
@@ -362,6 +368,18 @@ extends AbstractWikipediaShortestPathFinder {
             while (!QUEUE.isEmpty()) {
                 if (exit) {
                     return;
+                }
+                
+                if (QUEUE.isEmpty()) {
+                    int trials = 0;
+                    
+                    while (trials < dequeuTrials && QUEUE.isEmpty()) {
+                        mysleep(trialWaitTime);
+                    }
+                    
+                    if (QUEUE.isEmpty()) {
+                        return;
+                    }
                 }
                 
                 final String current = QUEUE.removeFirst();
@@ -557,10 +575,42 @@ extends AbstractWikipediaShortestPathFinder {
             if (distance > bestPathLengthSoFar) {
                 searchStateForward .requestThreadsToExit();
                 searchStateBackward.requestThreadsToExit();
+                pathIsFound = true;
                 return true;
             }
             
             return false;
+        }
+        
+        synchronized List<String> getPath() {
+            if (!pathIsFound) {
+                return new ArrayList<>();
+            }
+            
+            final Map<String, String> parentMapForward = 
+                    searchStateForward.getParentMap();
+            
+            final Map<String, String> parentMapBackward = 
+                    searchStateBackward.getParentMap();
+            
+            final List<String> path = new ArrayList<>();
+            
+            String current = touchNode;
+            
+            while (current != PARENT_MAP_END_TOKEN) {
+                path.add(current);
+                current = parentMapForward.get(current);
+            }
+            
+            Collections.<String>reverse(path);
+            current = parentMapBackward.get(touchNode);
+            
+            while (current != PARENT_MAP_END_TOKEN) {
+                path.add(current);
+                current = parentMapBackward.get(current);
+            }
+            
+            return path;
         }
     }
     
