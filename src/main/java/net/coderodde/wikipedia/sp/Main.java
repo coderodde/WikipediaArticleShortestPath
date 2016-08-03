@@ -77,15 +77,22 @@ public class Main {
         
         if (numberOfThreads < 2) {
             finder = new BidirectionalWikipediaShortestPathFinder();
-        } else if (numberOfThreads == 2) {
-            finder = new ParallelBidirectionalWikipediaShortestPathFinder();
         } else {
             finder = new 
             ParallelMultidirectionalWikipediaShortestPathFinder(
-                    arguments.getThreadCount() / 2,
-                    arguments.getDequeueTrials(),
-                    arguments.getTrialWaitTime());
+                    arguments.getThreadCount() / 2);
         }
+//        if (numberOfThreads < 2) {
+//            finder = new BidirectionalWikipediaShortestPathFinder();
+//        } else if (numberOfThreads == 2) {
+//            finder = new ParallelBidirectionalWikipediaShortestPathFinder();
+//        } else {
+//            finder = new 
+//            ParallelMultidirectionalWikipediaShortestPathFinder(
+//                    arguments.getThreadCount() / 2,
+//                    arguments.getDequeueTrials(),
+//                    arguments.getTrialWaitTime());
+//        }
         
         String sourceTitle = fromUrlHandler.getTitle();
         String targetTitle = toUrlHandler.getTitle();
@@ -99,7 +106,14 @@ public class Main {
                            " milliseconds, expanding " + 
                            finder.getNumberOfExpandedNodes() + 
                            " nodes.");
-
+       
+        System.out.println("[RESULT] A shortest path:");
+        
+        if (path.isEmpty()) {
+            System.out.println("Target not reachable from the source.");
+        }
+        
+        // If empty, is a no-op.
         path.forEach(System.out::println);
     }
     
