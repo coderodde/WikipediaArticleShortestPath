@@ -68,10 +68,13 @@ public abstract class AbstractWikipediaShortestPathFinder {
      */
     protected int numberOfExpandedNodes;
 
-    public abstract List<String> search(String sourceTitle, 
-                                        String targetTitle,
-                                        String apiUrlText,
-                                        PrintStream out);
+    public abstract List<String> 
+        search(String sourceTitle, 
+               String targetTitle,
+               String apiUrlText,
+               ProgressLogger<String> forwardSearchProgressLogger,
+               ProgressLogger<String> backwardSearchProgressLogger,
+               ProgressLogger<String> sharedProgressLogger);
 
     /**
      * Returns the duration of the search in milliseconds.
@@ -172,7 +175,6 @@ public abstract class AbstractWikipediaShortestPathFinder {
      */
     protected static List<String> getChildArticles(String apiUrl,
                                                    String current) {
-        System.out.println("current = " + current);
         return baseGetNeighbors(apiUrl, current, true);
     }
 

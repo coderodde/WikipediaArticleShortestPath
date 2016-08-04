@@ -1,6 +1,5 @@
 package net.coderodde.wikipedia.sp.support;
 
-import java.io.PrintStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
+import net.coderodde.wikipedia.sp.ProgressLogger;
 
 /**
  * This class implements a parallel multidirectional breadth-first search for 
@@ -58,10 +58,17 @@ extends AbstractWikipediaShortestPathFinder {
     }
     
     @Override
-    public List<String> search(final String sourceTitle,
-                               final String targetTitle,
-                               final String apiUrlText, 
-                               final PrintStream out) {
+    public List<String> 
+        search(final String sourceTitle,
+               final String targetTitle,
+               final String apiUrlText, 
+               final ProgressLogger<String> forwardSearchProgressLogger,
+               final ProgressLogger<String> backwardSearchProgressLogger,
+               final ProgressLogger<String> sharedProgressLogger) {
+        if (sharedProgressLogger != null) {
+            sharedProgressLogger.onBeginSearch(sourceTitle, targetTitle);
+        }
+            
         // TODO: Find out whether this if is necessary.
         if (sourceTitle.equals(targetTitle)) {
             final List<String> ret = new ArrayList<>(1);
@@ -74,22 +81,13 @@ extends AbstractWikipediaShortestPathFinder {
             return ret;
         }
         
-//        if (getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
-//            this.duration = 0;
-//            System.out.println("BAD SOURCE");
-//            return new ArrayList<>(1);
-//        }
-//        
-//        if (getParentArticles(apiUrlText, targetTitle).isEmpty()) {
-//            this.duration = 0;
-//            System.out.println("BAD TARGET");
-//            return new ArrayList<>(1);
-//        }
-        
         this.duration = System.currentTimeMillis();
         
         // Create the state object shared by both the search direction:
-        final SharedSearchState sharedSearchState = new SharedSearchState();
+        final SharedSearchState sharedSearchState = 
+                new SharedSearchState(sourceTitle, 
+                                      targetTitle, 
+                                      sharedProgressLogger);
         
         // Create the state object shared by all the threads working on forward
         // direction:
@@ -111,7 +109,7 @@ extends AbstractWikipediaShortestPathFinder {
                 new ForwardSearchThread(forwardSearchState,
                                         sharedSearchState, 
                                         true,
-                                        out, 
+                                        forwardSearchProgressLogger,
                                         0,
                                         apiUrlText);
         
@@ -123,7 +121,7 @@ extends AbstractWikipediaShortestPathFinder {
                     new ForwardSearchThread(forwardSearchState,
                                             sharedSearchState,
                                             false,
-                                            out,
+                                            forwardSearchProgressLogger,
                                             i,
                                             apiUrlText);
             
@@ -138,7 +136,7 @@ extends AbstractWikipediaShortestPathFinder {
                 new BackwardSearchThread(backwardSearchState, 
                                          sharedSearchState, 
                                          true, 
-                                         out, 
+                                         backwardSearchProgressLogger, 
                                          forwardSearchThreads.length, 
                                          apiUrlText);
         
@@ -150,7 +148,7 @@ extends AbstractWikipediaShortestPathFinder {
                     new BackwardSearchThread(backwardSearchState, 
                                              sharedSearchState,
                                              false,
-                                             out, 
+                                             backwardSearchProgressLogger, 
                                              forwardSearchThreads.length + i,
                                              apiUrlText);
             
@@ -289,36 +287,22 @@ extends AbstractWikipediaShortestPathFinder {
          * @param thread the thread to introduce.
          */
         void introduceThread(final StoppableThread thread) {
-            System.out.println("[!] Introducing thread " + thread);
             // WARNING: set instead of list here.
             runningThreadSet.add(thread);
         }
         
         void putThreadToSleep(final SleepingThread thread) {
-            System.out.println("[!] Putting thread " + thread + " to sleep.");
             sleepingThreadSet.add(thread);
             thread.putThreadToSleep(true);
         }
         
         void wakeupAllThreads() {
-            System.out.println("[!] Waking up all threads.");
             for (final SleepingThread thread : sleepingThreadSet) {
                 thread.putThreadToSleep(false);
             }
             
             sleepingThreadSet.clear();
         }
-        
-//        void wakeupThread() {
-//            if (sleepingThreadSet.size() == 0) {
-//                System.out.println("[!] No threads to wake up!");
-//                return;
-//            }
-//            
-//            final SleepingThread thread = sleepingThreadSet.iterator().next();
-//            thread.putThreadToSleep(false);
-//            System.out.println("[!] Waking up thread " + thread);
-//        }
         
         void removeThread(final StoppableThread thread) {
             runningThreadSet.remove(thread);
@@ -381,10 +365,9 @@ extends AbstractWikipediaShortestPathFinder {
         protected final boolean isMasterThread;
         
         /**
-         * The output stream for possibly logging the search progress. The value
-         * of {@code null} is allowed.
+         * The progress logger.
          */
-        protected final PrintStream out;
+        protected final ProgressLogger<String> searchProgressLogger;
         
         /**
          * Caches the amount of nodes expanded by this thread.
@@ -411,15 +394,15 @@ extends AbstractWikipediaShortestPathFinder {
         SearchThread(final SearchState searchState, 
                      final SharedSearchState sharedSearchState,
                      final boolean isMasterThread,
-                     final PrintStream out,
+                     final ProgressLogger<String> searchProgressLogger,
                      final int id,
                      final String apiUrlText) {
-            this.searchState       = searchState;
-            this.sharedSearchState = sharedSearchState;
-            this.isMasterThread    = isMasterThread;
-            this.out               = out;
-            this.id                = id;
-            this.apiUrlText        = apiUrlText;
+            this.searchState          = searchState;
+            this.sharedSearchState    = sharedSearchState;
+            this.isMasterThread       = isMasterThread;
+            this.searchProgressLogger = searchProgressLogger;
+            this.id                   = id;
+            this.apiUrlText           = apiUrlText;
         }
             
         @Override
@@ -465,16 +448,17 @@ extends AbstractWikipediaShortestPathFinder {
          * @param master      the boolean flag indicating whether this search
          *                    thread is a master or a slave thread.
          */
-        ForwardSearchThread(final SearchState searchState, 
-                            final SharedSearchState sharedSearchState,
-                            final boolean isMasterThread,
-                            final PrintStream out,
-                            final int id,
-                            final String apiUrlText) {
+        ForwardSearchThread(
+                final SearchState searchState, 
+                final SharedSearchState sharedSearchState,
+                final boolean isMasterThread,
+                final ProgressLogger<String> searchProgressLogger,
+                final int id,
+                final String apiUrlText) {
             super(searchState, 
                   sharedSearchState,
                   isMasterThread,
-                  out,
+                  searchProgressLogger,
                   id,
                   apiUrlText);
         }
@@ -532,10 +516,8 @@ extends AbstractWikipediaShortestPathFinder {
                     searchState.wakeupAllThreads();
                 }
                 
-                if (out != null) {
-                    out.println("[Forward search thread " + 
-                                getId() + 
-                                " expanding: " + current + "]");
+                if (searchProgressLogger != null) {
+                    searchProgressLogger.onExpansion(current);
                 }
              
                 sharedSearchState.updateFromForwardDirection(current);
@@ -553,6 +535,10 @@ extends AbstractWikipediaShortestPathFinder {
                         PARENTS.put(child, current);
                         DISTANCE.put(child, DISTANCE.get(current) + 1);
                         QUEUE.enqueue(child);
+                        
+                        if (searchProgressLogger != null) {
+                            searchProgressLogger.onNeighborGeneration(child);
+                        }
                     }
                 }
             }
@@ -574,13 +560,13 @@ extends AbstractWikipediaShortestPathFinder {
         BackwardSearchThread(final SearchState searchState, 
                              final SharedSearchState sharedSearchState,
                              final boolean isMasterThread,
-                             final PrintStream out,
+                             final ProgressLogger progressLogger,
                              final int id,
                              final String apiUrlText) {
             super(searchState, 
                   sharedSearchState,
                   isMasterThread,
-                  out,
+                  progressLogger,
                   id,
                   apiUrlText);
         }
@@ -639,10 +625,8 @@ extends AbstractWikipediaShortestPathFinder {
                     searchState.wakeupAllThreads();
                 }
                 
-                if (out != null) {
-                    out.println("[Backward search thread " + 
-                                getId() + 
-                                " expanding: " + current + "]");
+                if (searchProgressLogger != null) {
+                    searchProgressLogger.onExpansion(current);
                 }
                 
                 sharedSearchState.updateFromBackwardDirection(current);
@@ -659,6 +643,10 @@ extends AbstractWikipediaShortestPathFinder {
                         PARENTS.put(parent, current);
                         DISTANCE.put(parent, DISTANCE.get(current) + 1);
                         QUEUE.enqueue(parent);
+                        
+                        if (searchProgressLogger != null) {
+                            searchProgressLogger.onNeighborGeneration(parent);
+                        }
                     }
                 }
             }
@@ -669,6 +657,16 @@ extends AbstractWikipediaShortestPathFinder {
      * This class holds the state shared by the two search directions.
      */
     private static final class SharedSearchState {
+        
+        /**
+         * The source node.
+         */
+        private final String source;
+        
+        /**
+         * The target node. 
+         */
+        private final String target;
         
         /**
          * The state of all the forward search threads.
@@ -694,6 +692,19 @@ extends AbstractWikipediaShortestPathFinder {
          * Caches whether the shortest path was found.
          */
         private boolean pathIsFound;
+        
+        /**
+         * The progress logger for reporting the progress.
+         */
+        private final ProgressLogger<String> sharedProgressLogger;
+        
+        SharedSearchState(final String source,
+                          final String target,
+                          final ProgressLogger<String> sharedProgressLogger) {
+            this.source = source;
+            this.target = target;
+            this.sharedProgressLogger = sharedProgressLogger;
+        }
         
         void setForwardSearchState(final SearchState searchStateForward) {
             this.searchStateForward = searchStateForward;
@@ -757,6 +768,7 @@ extends AbstractWikipediaShortestPathFinder {
                 searchStateForward .requestThreadsToExit();
                 searchStateBackward.requestThreadsToExit();
                 pathIsFound = true;
+                
                 return true;
             }
             
@@ -770,6 +782,10 @@ extends AbstractWikipediaShortestPathFinder {
         
         synchronized List<String> getPath() {
             if (!pathIsFound) {
+                if (sharedProgressLogger != null) {
+                    sharedProgressLogger.onTargetUnreachable(source, target);
+                }
+                
                 return new ArrayList<>();
             }
             
@@ -794,6 +810,10 @@ extends AbstractWikipediaShortestPathFinder {
             while (current != null) {
                 path.add(current);
                 current = parentMapBackward.get(current);
+            }
+
+            if (sharedProgressLogger != null) {
+                sharedProgressLogger.onShortestPath(path);
             }
             
             return path;

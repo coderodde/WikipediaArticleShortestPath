@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
+import net.coderodde.wikipedia.sp.ProgressLogger;
 
 /**
  * This class implements a parallel bidirectional breadth-first search for 
@@ -36,14 +37,19 @@ extends AbstractWikipediaShortestPathFinder {
      * @param source the title of the source article.
      * @param target the title of the target article.
      * @param apiUrlText  the Wikipedia API access URL text.
-     * @param out         the output stream to write the progress to.
+     * @param forwardSearchProgressLogger
+     * @param backwardSearchProgressLogger
+     * @param sharedProgressLogger
      * @return the shortest path.
      */
     @Override
-    public List<String> search(String source,
-                               String target, 
-                               String apiUrlText, 
-                               PrintStream out) {
+    public List<String> 
+        search(String source,
+               String target, 
+               String apiUrlText, 
+               final ProgressLogger<String> forwardSearchProgressLogger,
+               final ProgressLogger<String> backwardSearchProgressLogger,
+               final ProgressLogger<String> sharedProgressLogger) {
         this.numberOfExpandedNodes = 0;
         this.duration = 0L;
 
@@ -63,12 +69,12 @@ extends AbstractWikipediaShortestPathFinder {
         ForwardThread forwardThread = new ForwardThread(source,
                                                         apiUrlText,
                                                         touchNodeHolder,
-                                                        out);
+                                                        forwardSearchProgressLogger);
 
         BackwardThread backwardThread = new BackwardThread(target,
                                                            apiUrlText,
                                                            touchNodeHolder,
-                                                           out);
+                                                           backwardSearchProgressLogger);
        
         forwardThread.setCompanionThread(backwardThread);
         backwardThread.setCompanionThread(forwardThread);
@@ -96,6 +102,8 @@ extends AbstractWikipediaShortestPathFinder {
         }
         
         List<String> path = touchNodeHolder.constructPath();
+        
+        
         this.numberOfExpandedNodes = forwardThread.getNumberOfExpandedNodes() +
                                     backwardThread.getNumberOfExpandedNodes();
 
@@ -110,7 +118,9 @@ extends AbstractWikipediaShortestPathFinder {
         private final Map<String, Integer> DISTANCE = new ConcurrentHashMap<>();
         private final TouchNodeHolder touchNodeHolder;
         private final String apiUrlText;
-        private final PrintStream out;
+        
+        private final ProgressLogger<String> searchProgressLogger;
+        
         private int numberOfExpandedNodes;
         private BackwardThread companionThread;
         private volatile boolean exit;
@@ -118,10 +128,10 @@ extends AbstractWikipediaShortestPathFinder {
         ForwardThread(String sourceTitle, 
                       String apiUrlText,
                       TouchNodeHolder touchNodeHolder,
-                      PrintStream out) {
+                      ProgressLogger<String> searchProgressLogger) {
             this.apiUrlText = apiUrlText;
             this.touchNodeHolder = touchNodeHolder;
-            this.out = out;
+            this.searchProgressLogger = searchProgressLogger;
 
             QUEUE.add(sourceTitle);
             PARENTS.put(sourceTitle, PARENT_MAP_END_TOKEN);
@@ -157,8 +167,8 @@ extends AbstractWikipediaShortestPathFinder {
 
                 String current = QUEUE.removeFirst();
 
-                if (out != null) {
-                    out.println("[Forward search expanding:  " + current + "]");
+                if (searchProgressLogger != null) {
+                    searchProgressLogger.onExpansion(current);
                 }
 
                 touchNodeHolder.updateFromForwardSearch(current);
@@ -189,7 +199,7 @@ extends AbstractWikipediaShortestPathFinder {
         private final Map<String, Integer> DISTANCE = new ConcurrentHashMap<>();
         private final TouchNodeHolder touchNodeHolder;
         private final String apiUrlText;
-        private final PrintStream out;
+        private final ProgressLogger<String> searchProgressLogger;
         private int numberOfExpandedNodes;
         private volatile boolean exit;
         private ForwardThread companionThread;
@@ -197,10 +207,10 @@ extends AbstractWikipediaShortestPathFinder {
         BackwardThread(String targetTitle, 
                        String apiUrlText,
                        TouchNodeHolder touchNodeHolder,
-                       PrintStream out) {
+                       ProgressLogger<String> searchProgressLogger) {
             this.apiUrlText = apiUrlText;
             this.touchNodeHolder = touchNodeHolder;
-            this.out = out;
+            this.searchProgressLogger = searchProgressLogger;
 
             QUEUE.add(targetTitle);
             PARENTS.put(targetTitle, PARENT_MAP_END_TOKEN);
@@ -236,10 +246,10 @@ extends AbstractWikipediaShortestPathFinder {
 
                 String current = QUEUE.removeFirst();
 
-                if (out != null) {
-                    out.println("[Backward search expanding: " + current + "]");
+                if (searchProgressLogger != null) {
+                    searchProgressLogger.onExpansion(current);
                 }
-
+                
                 touchNodeHolder.updateFromBackwardThread(current);
 
                 if (touchNodeHolder.pathIsOptimal(current)) {

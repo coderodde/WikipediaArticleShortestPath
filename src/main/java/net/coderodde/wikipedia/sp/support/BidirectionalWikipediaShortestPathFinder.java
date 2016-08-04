@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.coderodde.wikipedia.sp.AbstractWikipediaShortestPathFinder;
+import net.coderodde.wikipedia.sp.ProgressLogger;
 
 /**
  * This class implements a bidirectional breadth-first search for finding 
@@ -28,14 +29,18 @@ extends AbstractWikipediaShortestPathFinder {
      * @param sourceTitle the title of the source article.
      * @param targetTitle the title of the target article.
      * @param apiUrlText  the Wikipedia API access URL text.
-     * @param out         the output stream to write the progress to.
+     * @param forwardSearchProgressLogger
+     * @param sharedProgressLogger
+     * @param backwardSearchProgressLogger
      * @return the shortest path.
      */
     @Override
     public List<String> search(String sourceTitle, 
                                String targetTitle, 
                                String apiUrlText, 
-                               PrintStream out) {
+                               ProgressLogger<String> forwardSearchProgressLogger,
+                               ProgressLogger<String> backwardSearchProgressLogger,
+                               ProgressLogger<String> sharedProgressLogger) {
         this.numberOfExpandedNodes = 0;
         this.duration = 0L;
 
@@ -84,8 +89,8 @@ extends AbstractWikipediaShortestPathFinder {
             if (DISTANCEA.size() < DISTANCEB.size()) {
                 String current = QUEUEA.removeFirst();
 
-                if (out != null) {
-                    out.println("Forward:  " + current);
+                if (forwardSearchProgressLogger != null) {
+                    forwardSearchProgressLogger.onExpansion(current);
                 }
 
                 if (PARENTSB.containsKey(current) 
@@ -103,13 +108,18 @@ extends AbstractWikipediaShortestPathFinder {
                         PARENTSA.put(child, current);
                         DISTANCEA.put(child, DISTANCEA.get(current) + 1);
                         QUEUEA.addLast(child);
+                        
+                        if (forwardSearchProgressLogger != null) {
+                            forwardSearchProgressLogger
+                                    .onNeighborGeneration(child);
+                        }
                     }
                 }
             } else {
                 String current = QUEUEB.removeFirst();
 
-                if (out != null) {
-                    out.println("Backward: " + current);
+                if (backwardSearchProgressLogger != null) {
+                    backwardSearchProgressLogger.onExpansion(current);
                 }
 
                 if (PARENTSA.containsKey(current) 
@@ -127,6 +137,11 @@ extends AbstractWikipediaShortestPathFinder {
                         PARENTSB.put(parent, current);
                         DISTANCEB.put(parent, DISTANCEB.get(current) + 1);
                         QUEUEB.addLast(parent);
+                        
+                        if (backwardSearchProgressLogger != null) {
+                            backwardSearchProgressLogger
+                                    .onNeighborGeneration(parent);
+                        }
                     }
                 }
             }

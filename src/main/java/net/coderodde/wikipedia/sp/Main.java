@@ -82,25 +82,26 @@ public class Main {
             ParallelMultidirectionalWikipediaShortestPathFinder(
                     arguments.getThreadCount() / 2);
         }
-//        if (numberOfThreads < 2) {
-//            finder = new BidirectionalWikipediaShortestPathFinder();
-//        } else if (numberOfThreads == 2) {
-//            finder = new ParallelBidirectionalWikipediaShortestPathFinder();
-//        } else {
-//            finder = new 
-//            ParallelMultidirectionalWikipediaShortestPathFinder(
-//                    arguments.getThreadCount() / 2,
-//                    arguments.getDequeueTrials(),
-//                    arguments.getTrialWaitTime());
-//        }
+
+        final ProgressLogger<String> forwardSearchProgressLogger = 
+                new ForwardSearchProgressLogger();
         
-        String sourceTitle = fromUrlHandler.getTitle();
-        String targetTitle = toUrlHandler.getTitle();
+        final ProgressLogger<String> backwardSearchProgressLogger =
+                new BackwardSearchProgressLogger();
+        
+        final ProgressLogger<String> sharedSearchProgressLogger = 
+                new SharedProgressLogger();
+        
+        final String sourceTitle = fromUrlHandler.getTitle();
+        final String targetTitle = toUrlHandler.getTitle();
 
         List<String> path = finder.search(sourceTitle,
                                           targetTitle, 
                                           fromUrlHandler.getAPIURL(), 
-                                          out);
+                                          forwardSearchProgressLogger,
+                                          backwardSearchProgressLogger,
+                                          sharedSearchProgressLogger);
+                                          
 
         System.out.println("[RESULT] The search took " + finder.getDuration() +
                            " milliseconds, expanding " + 
