@@ -74,17 +74,17 @@ extends AbstractWikipediaShortestPathFinder {
             return ret;
         }
         
-        if (getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
-            this.duration = 0;
-            System.out.println("BAD SOURCE");
-            return new ArrayList<>(1);
-        }
-        
-        if (getParentArticles(apiUrlText, targetTitle).isEmpty()) {
-            this.duration = 0;
-            System.out.println("BAD TARGET");
-            return new ArrayList<>(1);
-        }
+//        if (getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
+//            this.duration = 0;
+//            System.out.println("BAD SOURCE");
+//            return new ArrayList<>(1);
+//        }
+//        
+//        if (getParentArticles(apiUrlText, targetTitle).isEmpty()) {
+//            this.duration = 0;
+//            System.out.println("BAD TARGET");
+//            return new ArrayList<>(1);
+//        }
         
         this.duration = System.currentTimeMillis();
         
@@ -503,7 +503,6 @@ extends AbstractWikipediaShortestPathFinder {
                 
                 if (current == null) {
                     if (isMasterThread) {
-                        
                         int trials = 0;
                         
                         while (trials < 50) {
@@ -519,6 +518,7 @@ extends AbstractWikipediaShortestPathFinder {
                         if (searchState.getSleepingThreadCount()
                                 == searchState.getTotalNumberOfThreads() - 1) {
                             sharedSearchState.requestExit();
+                            return;
                         } else {
                             continue;
                         }
@@ -625,6 +625,7 @@ extends AbstractWikipediaShortestPathFinder {
                         if (searchState.getSleepingThreadCount()
                                 == searchState.getTotalNumberOfThreads() - 1) {
                             sharedSearchState.requestExit();
+                            return;
                         } else {
                             continue;
                         }

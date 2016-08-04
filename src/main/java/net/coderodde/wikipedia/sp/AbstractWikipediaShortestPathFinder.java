@@ -158,9 +158,9 @@ public abstract class AbstractWikipediaShortestPathFinder {
                     "Wikipedia API: " + ex.getMessage(), ex);
         }
 
-            return forward ?
-                   extractForwardLinkTitles(jsonText) : 
-                   extractBackwardLinkTitles(jsonText);
+        return forward ?
+               extractForwardLinkTitles(jsonText) : 
+               extractBackwardLinkTitles(jsonText);
     }
 
     /**
@@ -172,6 +172,7 @@ public abstract class AbstractWikipediaShortestPathFinder {
      */
     protected static List<String> getChildArticles(String apiUrl,
                                                    String current) {
+        System.out.println("current = " + current);
         return baseGetNeighbors(apiUrl, current, true);
     }
 
