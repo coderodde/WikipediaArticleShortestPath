@@ -70,16 +70,16 @@ extends AbstractWikipediaShortestPathFinder {
         }
             
         // TODO: Find out whether this if is necessary.
-        if (sourceTitle.equals(targetTitle)) {
-            final List<String> ret = new ArrayList<>(1);
-            
-            // The article exists?
-            if (!getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
-                ret.add(sourceTitle);
-            }
-        
-            return ret;
-        }
+//        if (sourceTitle.equals(targetTitle)) {
+//            final List<String> ret = new ArrayList<>(1);
+//            
+//            // The article exists?
+//            if (!getChildArticles(apiUrlText, sourceTitle).isEmpty()) {
+//                ret.add(sourceTitle);
+//            }
+//        
+//            return ret;
+//        }
         
         this.duration = System.currentTimeMillis();
         
